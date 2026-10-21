@@ -72,6 +72,40 @@
 		vin-supply = <&vcc_5v>;
 	};
 
+	sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,name = "Archos 101 Oxygen";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,hp-det-gpios = <&gpio7 RK_PA7 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&hp_det>;
+		simple-audio-card,widgets =
+			"Speaker", "Speaker",
+			"Headphone", "Headphones",
+			"Microphone", "Internal Mic",
+			"Microphone", "Headset Mic";
+		simple-audio-card,routing =
+			"Speaker", "SPOLP",
+			"Speaker", "SPOLN",
+			"Speaker", "SPORP",
+			"Speaker", "SPORN",
+			"Headphones", "HPOL",
+			"Headphones", "HPOR",
+			"IN1P", "Internal Mic",
+			"IN2P", "Headset Mic",
+			"Headset Mic", "MICBIAS1",
+			"Internal Mic", "MICBIAS1";
+
+		simple-audio-card,cpu {
+			sound-dai = <&i2s>;
+		};
+
+		simple-audio-card,codec {
+			sound-dai = <&rt5640>;
+		};
+	};
+
 	backlight: backlight {
 		compatible = "pwm-backlight";
 		pwms = <&pwm0 0 25000 0>;
@@ -367,13 +401,38 @@
 };
 
 &i2c1 {
-	/* mpu6050 @0x68, ak8963 @0x0d: not wired up yet */
+	/* The stock kernel uses the internal pull-ups; the MPU-6050 needs them */
+	pinctrl-0 = <&i2c1_xfer_pu>;
 	status = "okay";
+
+	magnetometer@d {
+		compatible = "asahi-kasei,ak8963";
+		reg = <0x0d>;
+	};
+
+	imu@68 {
+		compatible = "invensense,mpu6050";
+		reg = <0x68>;
+		interrupt-parent = <&gpio8>;
+		interrupts = <RK_PA0 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&mpu_int>;
+	};
 };
 
 &i2c2 {
-	/* rt5623 @0x1a, rt3261 @0x1c: audio not wired up yet */
+	pinctrl-0 = <&i2c2_xfer_pu>;
 	status = "okay";
+
+	/* Realtek RT5640, sold to Rockchip as "RT3224"/"RT3261" */
+	rt5640: audio-codec@1c {
+		compatible = "realtek,rt5640";
+		reg = <0x1c>;
+		clocks = <&cru SCLK_I2S0_OUT>;
+		clock-names = "mclk";
+		realtek,ldo1-en-gpios = <&gpio7 RK_PB0 GPIO_ACTIVE_HIGH>;
+		#sound-dai-cells = <0>;
+	};
 };
 
 &i2c4 {
@@ -394,7 +453,51 @@
 	};
 };
 
+&gpio0 {
+	/*
+	 * Not in the stock device tree, which calls this pin "otg_drv". The
+	 * stock kernel drives it low, and the MPU-6050 doesn't answer
+	 * otherwise.
+	 */
+	mpu-enable-hog {
+		gpio-hog;
+		gpios = <RK_PB4 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "mpu-enable";
+	};
+};
+
+&i2s {
+	status = "okay";
+};
+
 &pinctrl {
+	headphone {
+		hp_det: hp-det {
+			rockchip,pins = <7 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	i2c1 {
+		i2c1_xfer_pu: i2c1-xfer-pu {
+			rockchip,pins = <8 RK_PA4 1 &pcfg_pull_up>,
+					<8 RK_PA5 1 &pcfg_pull_up>;
+		};
+	};
+
+	i2c2 {
+		i2c2_xfer_pu: i2c2-xfer-pu {
+			rockchip,pins = <6 RK_PB1 1 &pcfg_pull_up>,
+					<6 RK_PB2 1 &pcfg_pull_up>;
+		};
+	};
+
+	imu {
+		mpu_int: mpu-int {
+			rockchip,pins = <8 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
 	keys {
 		pwr_key: pwr-key {
 			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -469,7 +572,8 @@
 &io_domains {
 	status = "okay";
 
-	audio-supply = <&vccio>;
+	/* The codec side of I2S and I2C2 runs at 1.8 V */
+	audio-supply = <&vcc_18>;
 	bb-supply = <&vccio>;
 	dvp-supply = <&vcc_18>;
 	flash0-supply = <&vcc_18>;

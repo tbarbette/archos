@@ -1,0 +1,21 @@
+clk: rockchip: rk3288: let i2s0_clkout set its parent's rate
+
+i2s0_clkout is the I2S MCLK output pin, usually the codec's master clock.
+Codec drivers such as rt5640 call clk_set_rate() on it with 256 * fs.
+Without CLK_SET_RATE_PARENT the mux can only pick a parent whose rate is
+already at most the request, so switching from 48 kHz to 44.1 kHz fails
+with -EINVAL (both i2s_pre at 12.288 MHz and xin12m are above
+11.2896 MHz). Let it adjust i2s_pre, the fractional I2S clock that the
+I2S controller sets to the same rate anyway, like clk_i2sout on rk3399.
+
+--- a/drivers/clk/rockchip/clk-rk3288.c	2026-10-21 15:45:51
++++ b/drivers/clk/rockchip/clk-rk3288.c	2026-10-21 15:45:51
+@@ -364,7 +364,7 @@
+ 			RK3288_CLKSEL_CON(8), 0,
+ 			RK3288_CLKGATE_CON(4), 2, GFLAGS,
+ 			&rk3288_i2s_fracmux),
+-	COMPOSITE_NODIV(SCLK_I2S0_OUT, "i2s0_clkout", mux_i2s_clkout_p, 0,
++	COMPOSITE_NODIV(SCLK_I2S0_OUT, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
+ 			RK3288_CLKGATE_CON(4), 0, GFLAGS),
+ 	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,

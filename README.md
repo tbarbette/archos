@@ -23,10 +23,14 @@ See [STORY.md](STORY.md) for how this port came to be.
 | CPU DVFS (126 MHz–1.6 GHz) | ✅ | SYR827 `vdd_cpu` |
 | GPU (Mali-T764, Panfrost) | ✅ | SYR828 `vdd_gpu`; Phosh renders with GLES |
 | Reboot to recovery/loader | ✅ | `syscon-reboot-mode`; PMIC re-power skipped for mode reboots |
+| Audio: speaker, internal mic | ✅ | RT5640 (`rt5640` + `simple-audio-card`), UCM profile in the device package |
+| Audio: headphones | 🧪 | jack sense on GPIO7_A7 |
+| Accelerometer, gyroscope (MPU-6050) | ✅ | `inv_mpu6050`; screen rotation needs the mount matrix |
+| Magnetometer (AK8963) | ✅ | `ak8975` |
 | Lid (hall sensor) | 🧪 | `SW_LID` on GPIO0_A6 |
-| Audio | ❌ | Realtek codec on I²S |
+| Camera (OV5640, parallel) | ❌ | no RK3288 camera interface driver in mainline |
+| Ambient light (US5151) | ❌ | no mainline driver |
 | USB host (`dwc2` ff540000) | ❌ | soft reset timeout |
-| Accelerometer, camera | ❌ | |
 
 ✅ tested, 🧪 in the image but not tested yet, ❌ not working.
 
@@ -42,7 +46,7 @@ See [STORY.md](STORY.md) for how this port came to be.
 | `release/` | prebuilt images (see below; not in git, published as release files) |
 | `wiki/` | draft page for wiki.postmarketos.org |
 | `upstream/` | pmaports merge request patch and checklist |
-| `notes/` | stock DTS, Android dmesg, parameter block, Rockchip U-Boot source excerpts, vendor VTL driver |
+| `notes/` | stock DTS, parameter block, Rockchip U-Boot source excerpts, vendor VTL driver, `android-probe/` (what the stock kernel sets) |
 | `backup/` | **private**: full eMMC backup of this tablet (contains the owner's Android data, never publish) |
 
 ## Installing

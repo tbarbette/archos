@@ -15,4 +15,4 @@ for p in ${*:-linux device}; do
 	# Keep the updated checksums
 	docker cp "$PMOS_CONTAINER:$aports/device/testing/$pkg/APKBUILD" "$here/pmaports/device/testing/$pkg/APKBUILD"
 done
-docker exec "$PMOS_CONTAINER" sh -c 'cp -p /work/packages/*/armv7/*archos-oxygen101*.apk /share/apks/; ls -t /share/apks | head -4'
+docker exec "$PMOS_CONTAINER" sh -c 'cp -p /work/packages/*/armv7/*archos-oxygen101*.apk /share/apks/; ls /share/apks | sort -V | tail -4'

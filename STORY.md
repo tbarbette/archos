@@ -15,15 +15,17 @@ KitKat. The last Firefox that runs on it is 68.11 (2020) and the last Chrome
 is 81. Most of the web is out of reach. The first attempt was the obvious one:
 side-load the newest browser that still supports Android 4.4. Firefox 68.11
 was installed with `adb` (the package manager crashed on the first try). It
-works, but it's a 2020 browser with no security updates.
+works, but it's a 2020 browser with no security updates and still prevent accessing many websites because of stale certificates.
 
 The search for a newer Android ROM went nowhere. LineageOS and CyanogenMod
 never supported this tablet. The one developer who looked at it on the
 ArcTablet forum in 2016 gave up because "there is no selinux kernel for that
 tab". The only community ROM is a rooted 4.4.4.
 
-The owner's verdict: *"The tablet is unusable anyway so you can brick it if
+So I launched Claude Opus 5.6 on it with this line : *"The tablet is unusable anyway so you can brick it if
 need be. I'll throw it to the bin if you can't succeed."*
+
+The following is entierly AI-done. I do understand what it *means* and you can judge my prompts below.
 
 ## Why postmarketOS had a chance
 
@@ -175,7 +177,7 @@ The tablet then got the comforts of a normal device:
 
 ## The morning after: from "it boots" to "it's usable"
 
-The owner used the tablet overnight and came back with three complaints:
+The owner (that's how Claude calls me :) ) used the tablet overnight and came back with three complaints:
 the power button didn't wake the screen, the battery always read 0%, and
 everything was slow. *"Is it just old or something is hooking up the CPU?
 And is the GPU support enabled?"*
@@ -183,12 +185,14 @@ And is the GPU support enabled?"*
 ### Finding the tablet
 
 The tablet was no longer on USB but on a lab WiFi network, and Phosh's WiFi
-panel didn't show its address. The access point's station list gave its MAC
+panel didn't show its address (note here how Claude went around the fact I forgot the cable at home...). The access point's station list gave its MAC
 address; a ping sweep and the ARP table gave its IP. From then on all the
 work went over SSH on WiFi. The owner also unplugged the USB cable, so the
 tablet was on the wall charger only.
 
 ### Battery at 0%, and a tablet that switched itself off
+
+NDLR : I had not even noticed the tablet was turning off by itself...
 
 The mainline `rn5t618-power` driver supports the RC5T619 charger and fuel
 gauge, and it was enabled. But it depends on the PMIC's ADC driver, which was
@@ -270,6 +274,76 @@ the SoC's warm reset keeps the flag. U-Boot acknowledges the flag by rewriting
 it (`0xC3524203` for recovery), and the tablet came up from `recovery`.
 A plain `reboot` still does the full PMIC power cycle.
 
+## The afternoon: sound and sensors
+
+*"Try to add support for accelerometers, camera and audio."*
+
+The stock device tree promised an MPU-6050 motion sensor and an RT3261 codec,
+but under mainline the MPU didn't answer on I²C and the codec's bus was
+empty. The supplies all matched the stock ones, so something the stock
+kernel did wasn't written in its device tree.
+
+### Asking the stock kernel
+
+The way to find out was to run the stock kernel again and look. The day-one
+debug recovery never brought up adb, so this time the stock **Android** boot
+image went into the `recovery` slot, with its ramdisk edited: SELinux
+permissive and a root shell service. The service is a 121-line static
+helper (`tools/rk.c`) that also reads physical memory and talks I²C, reached
+from the Mac through `adb forward`. Android booted from `recovery`, every
+vendor driver bound, and the I²C scan showed the MPU at 0x68 and the codec at
+0x1c.
+
+Dumping every GPIO, pin-mux and pull register under both kernels and
+diffing them gave a short list, and testing each entry live on pmOS settled
+it:
+
+- the codec needs **GPIO7_B0** high (its LDO1 enable; the stock DTS calls the
+  pin "3G modem power") **and** the audio IO domain at **1.8 V**, the same
+  kind of mistake as the eMMC one;
+- the MPU needs **GPIO0_B4** low (called `otg_drv` in the stock DTS) **and**
+  the SoC's internal **pull-ups** on I²C1.
+
+The ID registers did the rest. The "RT3224/RT3261" reports Realtek's RT5640
+ID, so mainline's `rt5640` driver works as is. The MPU's bypass bit is set,
+with an AK8963 magnetometer next to it. Opening the camera app made the HAL
+power up an **OV5640** on I²C3.
+
+### Getting sound out
+
+With the device tree fixed, the card came up and a hand-run sequence
+played a tone on the speaker. To find the microphone, the speaker played a
+1 kHz tone while each codec input recorded, and a Goertzel filter measured
+the tone: IN1 heard it, IN2 and IN3 didn't. The owner confirmed from the
+other side: *"I heard a bip bip!"*
+
+Two more fixes made it work in the desktop:
+
+- **A clock flag.** The codec asks for its master clock to change with the
+  sample rate. On RK3288 that clock output can't pass the request on to the
+  fractional divider behind it, so moving from 48 kHz to 44.1 kHz failed
+  with `-EINVAL`. One flag (`CLK_SET_RATE_PARENT`, as RK3399 already has)
+  fixed it.
+- **A UCM profile.** PulseAudio needs to know the codec's paths. Ubuntu's
+  Bay Trail tablets use the same codec, so the profile reuses their RT5640
+  sequences, adds the jack name simple-audio-card uses, and pins both
+  directions to 48 kHz because playback and capture share one I²S clock.
+
+The final check went through PulseAudio itself: playing on the speaker
+while recording from the microphone, the tone shows up exactly when it is
+played. *"One longer bip?"* asked the owner, and then: *"Should I tell you
+or you're toying with me?"*
+
+### Sensors and camera
+
+The MPU-6050 and the AK8963 came up with mainline's IIO drivers, and
+`iio-sensor-proxy` picked up the accelerometer. Screen rotation still needs a
+mount matrix, which takes holding the tablet in two positions.
+
+The camera stops at the SoC. Mainline has an OV5640 driver, but no driver
+for RK3288's camera input: `rkisp1` knows RK3399, PX30 and i.MX8MP only, and
+the parallel camera interface has no RK3288 support either.
+
 ## What it took
 
 - One stock U-Boot left untouched; nothing was ever written to the loader.
@@ -280,19 +354,21 @@ A plain `reboot` still does the full PMIC power cycle.
 - About four hours on the second day, entirely over SSH on WiFi, to fix the
   power key, the battery and charging, the CPU and GPU, the eMMC and the
   reboot modes.
-- Ten kernel package builds (r0–r9) and eight kernel patches: the device
-  tree, the panel, the keys, the io-domains and touch supply, the power-key
-  driver, the eMMC voltage fix, reboot-mode preservation, and the CPU/GPU
-  supplies. Two new input drivers (touchscreen, power key), one boot-deploy
+- Thirteen kernel package builds (r0–r12) and ten kernel patches: the
+  device tree, the panel, the keys, the io-domains and touch supply, the
+  power-key driver, the eMMC voltage fix, reboot-mode preservation, the
+  CPU/GPU supplies, audio and motion sensors, and an RK3288 clock flag. Two new input drivers (touchscreen, power key), one boot-deploy
   hook, one udev rule, and small Python tools for Rockchip image formats and
   register poking. About 540 shell commands on the Mac, all in
   `scripts/history/commands.md`.
 
 ## Still to do
 
-- Audio (Realtek codec on I²S).
+- Screen rotation: the accelerometer's mount matrix.
+- Headphone and headset mic test.
+- Camera: RK3288 support in a camera interface driver.
 - The second USB host controller (`dwc2` at `ff540000`) times out on reset.
-- Accelerometer, camera; test the lid sensor.
+- Light sensor (US5151) driver; test the lid sensor.
 - Upstreaming: the touchscreen and power-key drivers, the RC5T619 patches and
   the device tree to the kernel, and the device to pmaports.
 
@@ -356,12 +432,12 @@ acknowledgements like "Ok now" and "done" left out).
 17. *"Look at the same time why the tablet is so slow. Is it just old or
     something is hooking up the CPU? And is the GPU support enabled?"* → CPU
     DVFS and Panfrost.
-18. *"The tablet is connected on belink's wifi. Can you find its address? the
+18. *"The tablet is connected on [machine]'s wifi. Can you find its address? the
     postmarket wifi button leads to nothing, I can't see details"* → found
     through the access point's station list.
 19. *"There was both cables. I removed the USB so now it's only the wall
     plug"* → the charger input limit, found because the battery still drained.
-20. *"What is the ssh command to login?"* → as above.
+20. *"What is the ssh command to login?"* → as above. --> Yeah, sorry...
 21. *"I pressed it and it works"* → the power key.
 22. *"Update the repo with the current state and update the story with a
     summary of all my prompts"* → this appendix, a git repository for this
@@ -372,4 +448,12 @@ acknowledgements like "Ok now" and "done" left out).
     charger limit regression.
 24. *"Also, how do I change the user password so SSH is not open?"* →
     `passwd` on the tablet, or `scripts/secure-ssh.sh` (`passwd`,
-    `keys-only`, `off`).
+    `keys-only`, `off`). --> I did it, no need to try 147147 :)
+25. *"Try to add support for accelerometers, camera and audio"* → the rooted
+    stock Android, the register diff, the RT5640 and MPU-6050 device tree,
+    the clock flag and the UCM profile.
+26. *"The problem is I have some USB cables that are power only. Is the
+    tablet on the macos list now? Or should I try another cable."* → it
+    was; the cable carries data.
+27. *"I heard a bip bip!"*, *"One longer bip?"*, *"Should I tell you or
+    you're toying with me?"* → the speaker and loopback tests.

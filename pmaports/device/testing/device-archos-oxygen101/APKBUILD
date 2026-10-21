@@ -3,7 +3,7 @@ maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
 pkgname=device-archos-oxygen101
 pkgdesc="Archos 101 Oxygen"
 pkgver=2
-pkgrel=2
+pkgrel=3
 url="https://postmarketos.org"
 license="MIT"
 arch="armv7"
@@ -19,6 +19,8 @@ source="
 	deviceinfo
 	rockchip-rsce-second.sh
 	90-device-archos-oxygen101.rules
+	ucm/archos-oxygen101.conf
+	ucm/HiFi.conf
 "
 
 build() {
@@ -29,6 +31,14 @@ package() {
 	devicepkg_package $startdir $pkgname
 	install -Dm644 "$srcdir"/rockchip-rsce-second.sh \
 		"$pkgdir"/usr/share/mkinitfs/rockchip-rsce-second.sh
+
+	# ALSA UCM profile for the RT5640 sound card
+	local ucm="$pkgdir"/usr/share/alsa/ucm2
+	install -Dm644 -t "$ucm"/Rockchip/archos-oxygen101 \
+		"$srcdir"/archos-oxygen101.conf "$srcdir"/HiFi.conf
+	mkdir -p "$ucm"/conf.d/simple-card
+	ln -s ../../Rockchip/archos-oxygen101/archos-oxygen101.conf \
+		"$ucm/conf.d/simple-card/Archos 101 Oxygen.conf"
 }
 
 nonfree_firmware() {
@@ -41,4 +51,6 @@ sha512sums="
 f2e4b14f0e9f82a8cd7966532c12863449090ce8b61006d65d05f841cb2c580a22e35bdc2f0e7fcc296d3f46c13e6b6cbfa9dc17f58a0e149f3f1b64bff116a9  deviceinfo
 a5ff85175904e4af525914b66e5dbfc8591bd6548a149a2dc7f236e23597fe28784bfa73dce70057a46b6f314e8d4c0b0901b338e868470d9884b68b73770d13  rockchip-rsce-second.sh
 5ae5c1be52a652b52ee0828690cbf1089951e11ebaf928c88f2ff361c939b73e9def1e17d6be4190ba680233058299ef4005623a34005bd5e9f1945785957f43  90-device-archos-oxygen101.rules
+ed076e0b50031b490e6d948b4ddbc0636e3aea6aae5af3c7543d89bd731891d3394287341bfaddf42d42db3be66f691bdc4d8dfc88b8c692ae3448761e69c007  archos-oxygen101.conf
+3bed928623cbb556a139e8d7615452b5bb880b573b138707e51a6186854c43acf154a1cd36e543f09db17c6783597efcb13e33cb00c919619667564a7ad3f8c0  HiFi.conf
 "

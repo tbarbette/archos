@@ -26,8 +26,8 @@
 | status_mainline = Y
 | status_battery = Y
 | status_3d = Y
-| status_accel = N
-| status_audio = N
+| status_accel = Y
+| status_audio = Y
 | status_bluetooth =
 | status_camera = N
 | status_gps =
@@ -89,6 +89,16 @@ The mainline RK3288 reboot modes match it: <code>recovery</code>, <code>bootload
 | PMIC || Ricoh RC5T619 || rn5t618
 |-
 | CPU/GPU regulators || Silergy SYR827 (I²C0, 0x40) / SYR828 (0x41) || fan53555; CPU DVFS 126 MHz–1.6 GHz
+|-
+| Audio codec || Realtek RT5640 (I²C2, 0x1c; Rockchip name RT3224) || rt5640, simple-audio-card; LDO1_EN on GPIO7_B0, audio IO domain at 1.8 V
+|-
+| Accelerometer, gyroscope || InvenSense MPU-6050 (I²C1, 0x68) || inv_mpu6050; needs GPIO0_B4 low and I²C1 pull-ups
+|-
+| Magnetometer || AKM AK8963 (I²C1, 0x0d) || ak8975
+|-
+| Camera || OmniVision OV5640 (I²C3, 0x3c, parallel) || ov5640; no RK3288 camera interface driver
+|-
+| Light sensor || UPI US5151 (I²C4, 0x10) || none
 |-
 | GPU || Mali-T764 || panfrost (Phosh renders with GLES 3.1)
 |-
