@@ -1,7 +1,7 @@
 maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
 pkgname=linux-archos-oxygen101
 pkgver=6.12.90
-pkgrel=12
+pkgrel=13
 pkgdesc="Mainline kernel for the Archos 101 Oxygen (RK3288)"
 arch="armv7"
 _carch="arm"
@@ -96,6 +96,6 @@ f5dd5e3f79a8e0250b6b19a28e694a4ba3156b7dae99008822d013461a0a1b818aa74849b73133bc
 e9da3005d2844030e1f133baff9b406409af139d10d166f23dcbb0ee17702edbed9418fec3ae6fab559bd475dfd9123a9702b6cfed8bba307224a954a7f9d20a  0006-archos-oxygen101-emmc-io-domain.patch
 540267f61e4a06f5791defc956615f6bebcb00bec7689e729c51e63e36fe5b1cc73a58c02e962233de7f83b26eceead4662bb631145f6d7024257a386977c9d3  0007-mfd-rn5t618-keep-reboot-mode.patch
 2da792f2bf0fc3eaac13a830a2348e6d9e408f2172b64e94c4294fffb29048eec1a46ac9cd1536a8a052cda750afb4e9bb3175e0576b6bb2c8f686d68c6d3b9b  0008-archos-oxygen101-cpu-gpu-supplies.patch
-d0318eeeaf98332589dd5a0a79189678560dad4945773032192942cb1a23d6d43594b351d5d80a6b3e5e788dc16f5001d32d1ab47b16f8a6b073f8ee6ec0fa62  0009-archos-oxygen101-audio-imu.patch
+8164e75ba27aa4cb72f134a2670f291b8ba8ccf3b5fc6e3d62d81e23b6559f0676e697af4ea17c6bf3e61289a482e646d0caac04ea2e0845f3bbd18727c58362  0009-archos-oxygen101-audio-imu.patch
 0443f71ead1d5bc903c4508594276b2a837f277a502d069703365698d2fb09960a5d52cff408a1d63bc38a695880e0e75faf85c6c24030e8f035477fa6c9c543  0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
 "

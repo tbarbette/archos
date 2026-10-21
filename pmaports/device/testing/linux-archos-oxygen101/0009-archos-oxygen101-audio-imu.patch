@@ -1,5 +1,5 @@
 --- a/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 10:22:05
-+++ b/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 15:43:14
++++ b/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 17:20:21
 @@ -72,6 +72,40 @@
  		vin-supply = <&vcc_5v>;
  	};
@@ -41,7 +41,7 @@
  	backlight: backlight {
  		compatible = "pwm-backlight";
  		pwms = <&pwm0 0 25000 0>;
-@@ -367,13 +401,38 @@
+@@ -367,13 +401,42 @@
  };
  
  &i2c1 {
@@ -62,6 +62,10 @@
 +		interrupts = <RK_PA0 IRQ_TYPE_EDGE_RISING>;
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&mpu_int>;
++		/* The chip sits upside down: Y and Z point the other way */
++		mount-matrix = "1",  "0",  "0",
++			       "0", "-1",  "0",
++			       "0",  "0", "-1";
 +	};
  };
  
@@ -82,7 +86,7 @@
  };
  
  &i2c4 {
-@@ -394,7 +453,51 @@
+@@ -394,7 +457,51 @@
  	};
  };
  
@@ -134,7 +138,7 @@
  	keys {
  		pwr_key: pwr-key {
  			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>;
-@@ -469,7 +572,8 @@
+@@ -469,7 +576,8 @@
  &io_domains {
  	status = "okay";
  
