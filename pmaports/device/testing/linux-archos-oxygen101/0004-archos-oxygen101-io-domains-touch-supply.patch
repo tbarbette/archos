@@ -1,0 +1,39 @@
+--- a/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts
++++ b/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts
+@@ -363,6 +363,8 @@
+ 	touchscreen@1 {
+ 		compatible = "vtl,ct365";
+ 		reg = <0x01>;
++		/* Exact rail unknown, one of the always-on Ricoh 3.3 V LDOs */
++		vdd-supply = <&ldo8>;
+ 		interrupt-parent = <&gpio7>;
+ 		interrupts = <RK_PA6 IRQ_TYPE_EDGE_FALLING>;
+ 		pinctrl-names = "default";
+@@ -437,7 +439,27 @@
+ };
+ 
+ &tsadc {
++	status = "okay";
++};
++
++/*
++ * I/O voltage domains, from the stock kernel's io_vol_domain nodes. The
++ * SDIO WiFi bus runs at 1.8 V; Android's warm reboot kept this setting
++ * in the GRF, a full reset does not.
++ */
++&io_domains {
+ 	status = "okay";
++
++	audio-supply = <&vccio>;
++	bb-supply = <&vccio>;
++	dvp-supply = <&vcc_18>;
++	flash0-supply = <&vccio>;
++	flash1-supply = <&vccio>;
++	gpio1830-supply = <&vccio>;
++	gpio30-supply = <&vccio_pmu>;
++	lcdc-supply = <&vcc_lcd>;
++	sdcard-supply = <&vcc_sd>;
++	wifi-supply = <&vcc_wl>;
+ };
+ 
+ &saradc {

@@ -1,0 +1,125 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Power key driver for the Ricoh RC5T619 PMIC
+ *
+ * The PWRON pin of the PMIC is reported through the SYS interrupt: PWRIRQ
+ * bit 0 latches an edge (both edges with PWRIRSEL bit 0 set) and PWRMON
+ * bit 0 is the current level of the key.
+ */
+
+#include <linux/bits.h>
+#include <linux/input.h>
+#include <linux/interrupt.h>
+#include <linux/mfd/rn5t618.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+#include <linux/regmap.h>
+
+#define RN5T618_PWR_PWRON	BIT(0)
+
+struct rn5t618_pwrkey {
+	struct regmap *regmap;
+	struct input_dev *input;
+};
+
+static irqreturn_t rn5t618_pwrkey_irq(int irq, void *data)
+{
+	struct rn5t618_pwrkey *pwrkey = data;
+	unsigned int status, mon;
+	int ret;
+
+	ret = regmap_read(pwrkey->regmap, RN5T618_PWRIRQ, &status);
+	if (ret || !(status & RN5T618_PWR_PWRON))
+		return IRQ_NONE;
+
+	/* Interrupt bits are cleared by writing 0, 1 leaves them alone */
+	regmap_write(pwrkey->regmap, RN5T618_PWRIRQ,
+		     (u8)~RN5T618_PWR_PWRON);
+
+	ret = regmap_read(pwrkey->regmap, RN5T618_PWRMON, &mon);
+	if (ret)
+		return IRQ_HANDLED;
+
+	input_report_key(pwrkey->input, KEY_POWER, mon & RN5T618_PWR_PWRON);
+	input_sync(pwrkey->input);
+
+	return IRQ_HANDLED;
+}
+
+static int rn5t618_pwrkey_probe(struct platform_device *pdev)
+{
+	struct rn5t618 *rn5t618 = dev_get_drvdata(pdev->dev.parent);
+	struct rn5t618_pwrkey *pwrkey;
+	int irq, ret;
+
+	/* The MFD cells are added before the PMIC interrupt chip */
+	if (!rn5t618->irq_data)
+		return rn5t618->irq ? -EPROBE_DEFER : -ENODEV;
+
+	irq = regmap_irq_get_virq(rn5t618->irq_data, RN5T618_IRQ_SYS);
+	if (irq < 0)
+		return irq;
+
+	pwrkey = devm_kzalloc(&pdev->dev, sizeof(*pwrkey), GFP_KERNEL);
+	if (!pwrkey)
+		return -ENOMEM;
+
+	pwrkey->regmap = rn5t618->regmap;
+
+	pwrkey->input = devm_input_allocate_device(&pdev->dev);
+	if (!pwrkey->input)
+		return -ENOMEM;
+
+	pwrkey->input->name = "rn5t618-pwrkey";
+	pwrkey->input->phys = "rn5t618-pwrkey/input0";
+	pwrkey->input->id.bustype = BUS_HOST;
+	input_set_capability(pwrkey->input, EV_KEY, KEY_POWER);
+
+	ret = input_register_device(pwrkey->input);
+	if (ret)
+		return ret;
+
+	/* Report both press and release, drop anything latched before */
+	ret = regmap_update_bits(pwrkey->regmap, RN5T618_PWRIRSEL,
+				 RN5T618_PWR_PWRON, RN5T618_PWR_PWRON);
+	if (ret)
+		return ret;
+	regmap_write(pwrkey->regmap, RN5T618_PWRIRQ, (u8)~RN5T618_PWR_PWRON);
+
+	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+					rn5t618_pwrkey_irq, IRQF_ONESHOT,
+					"rn5t618-pwrkey", pwrkey);
+	if (ret)
+		return ret;
+
+	ret = regmap_update_bits(pwrkey->regmap, RN5T618_PWRIREN,
+				 RN5T618_PWR_PWRON, RN5T618_PWR_PWRON);
+	if (ret)
+		return ret;
+
+	device_init_wakeup(&pdev->dev, true);
+	platform_set_drvdata(pdev, pwrkey);
+
+	return 0;
+}
+
+static void rn5t618_pwrkey_remove(struct platform_device *pdev)
+{
+	struct rn5t618_pwrkey *pwrkey = platform_get_drvdata(pdev);
+
+	regmap_update_bits(pwrkey->regmap, RN5T618_PWRIREN,
+			   RN5T618_PWR_PWRON, 0);
+}
+
+static struct platform_driver rn5t618_pwrkey_driver = {
+	.driver = {
+		.name = "rn5t618-pwrkey",
+	},
+	.probe = rn5t618_pwrkey_probe,
+	.remove_new = rn5t618_pwrkey_remove,
+};
+module_platform_driver(rn5t618_pwrkey_driver);
+
+MODULE_ALIAS("platform:rn5t618-pwrkey");
+MODULE_DESCRIPTION("Ricoh RC5T619 power key driver");
+MODULE_LICENSE("GPL");

@@ -1,0 +1,72 @@
+--- a/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 10:22:05
++++ b/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 10:22:05
+@@ -132,22 +132,9 @@
+ };
+ 
+ &cpu0 {
+-	/* No cpu-supply yet: keep the frequency the loader set. */
+-	/delete-property/ operating-points-v2;
++	cpu-supply = <&vdd_cpu>;
+ };
+ 
+-&cpu1 {
+-	/delete-property/ operating-points-v2;
+-};
+-
+-&cpu2 {
+-	/delete-property/ operating-points-v2;
+-};
+-
+-&cpu3 {
+-	/delete-property/ operating-points-v2;
+-};
+-
+ &emmc {
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+@@ -199,6 +186,33 @@
+ 	clock-frequency = <400000>;
+ 	status = "okay";
+ 
++	/* Same CPU/GPU supplies as the veyron Chromebooks, VSEL0 in use */
++	vdd_cpu: regulator@40 {
++		compatible = "silergy,syr827";
++		reg = <0x40>;
++		fcs,suspend-voltage-selector = <1>;
++		regulator-name = "vdd_cpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1350000>;
++		regulator-ramp-delay = <8000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc_sys>;
++	};
++
++	vdd_gpu: regulator@41 {
++		compatible = "silergy,syr828";
++		reg = <0x41>;
++		fcs,suspend-voltage-selector = <1>;
++		regulator-name = "vdd_gpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1250000>;
++		regulator-ramp-delay = <6000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc_sys>;
++	};
++
+ 	pmic: pmic@32 {
+ 		compatible = "ricoh,rc5t619";
+ 		reg = <0x32>;
+@@ -347,6 +361,11 @@
+ 	};
+ };
+ 
++&gpu {
++	mali-supply = <&vdd_gpu>;
++	status = "okay";
++};
++
+ &i2c1 {
+ 	/* mpu6050 @0x68, ak8963 @0x0d: not wired up yet */
+ 	status = "okay";

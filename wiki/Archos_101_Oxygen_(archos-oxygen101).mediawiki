@@ -1,0 +1,112 @@
+{{Infobox device
+| manufacturer = Archos
+| name = 101 Oxygen
+| codename = archos-oxygen101
+| image =
+| imagecaption = Archos 101 Oxygen running Phosh
+| releaseyear = 2015
+| category = testing
+| originalsoftware = Android
+| originalversion = 4.4.4
+| chipset = Rockchip RK3288
+| cpu = 4x 1.8 GHz Cortex-A17
+| gpu = ARM Mali-T764
+| display = 1920x1200 IPS (MIPI DSI)
+| storage = 16 GB eMMC
+| memory = 2 GB
+| architecture = armv7
+| type = tablet
+| status_usbnet = Y
+| status_flashing = P
+| status_touch = Y
+| status_screen = Y
+| status_wifi = Y
+| status_xwayland =
+| status_fde =
+| status_mainline = Y
+| status_battery = Y
+| status_3d = Y
+| status_accel = N
+| status_audio = N
+| status_bluetooth =
+| status_camera = N
+| status_gps =
+| status_mobiledata =
+| status_sms =
+| status_calls =
+| status_otg = Y
+| booting = yes
+}}
+
+The '''Archos 101 Oxygen''' (model AC101OX) is a 10.1" tablet from 2015 built around the Rockchip [[Rockchip RK3288|RK3288]]. It runs a mainline kernel in postmarketOS, booted by the stock Rockchip U-Boot.
+
+== Contributors ==
+* [[User:tbarbette|tbarbette]]
+
+== Users owning this device ==
+{{Device owners}}
+
+== How to enter flash mode ==
+The tablet has no reliable key combination for the Rockchip loader. From Android with USB debugging enabled:
+<syntaxhighlight lang="shell-session">
+$ adb reboot bootloader
+$ rkdeveloptool ld
+</syntaxhighlight>
+From postmarketOS, <code>sudo systemctl reboot --reboot-argument=loader</code>. The loader is the Rockchip "rockusb" protocol, handled by [[Rkdeveloptool|rkdeveloptool]].
+
+If the tablet only reaches the stock recovery ("No command"), its menu (hold Power, tap Volume Up) has "update rkimage from external storage", which installs an unsigned Rockchip <code>update.img</code> from the microSD card (CRC-checked only).
+
+== Installation ==
+postmarketOS is installed on a microSD card; the kernel goes into the eMMC <code>boot</code> partition. The bootloader is never modified. '''Back up the eMMC first''' (<code>rkdeveloptool rl 0 0x50000 emmc-head.bin</code> covers all partitions up to <code>backup</code>).
+
+<syntaxhighlight lang="shell-session">
+$ pmbootstrap init                      # archos-oxygen101
+$ pmbootstrap install --sdcard=/dev/sdX
+$ pmbootstrap export
+$ adb reboot bootloader
+$ rkdeveloptool wl 0x16000 /tmp/postmarketOS-export/boot.img
+$ rkdeveloptool rd
+</syntaxhighlight>
+
+To dual boot, write <code>boot.img</code> to the recovery partition instead (<code>0x26000</code>) and boot postmarketOS with <code>adb reboot recovery</code>.
+
+Kernel upgrades are written to the eMMC by a <code>mkinitfs_postprocess</code> hook of the device package, to whichever of <code>boot</code>/<code>recovery</code> already holds a postmarketOS image.
+
+== Bootloader notes ==
+The stock loader is Rockchip U-Boot 2014.04 (<code>rkdevelop</code> branch). It boots Android v0 boot images (page size 16384) from the partitions of the Rockchip parameter block (no GPT), and:
+* ignores the load addresses in the image header;
+* loads the device tree from the "second" section, which must be a Rockchip RSCE resource image holding <code>rk-kernel.dtb</code> (otherwise it falls back to the vendor DTB in the <code>resource</code> partition);
+* takes the kernel command line from the parameter block, so the kernel uses <code>CONFIG_CMDLINE_EXTEND</code>;
+* does not verify signatures;
+* falls back to <code>recovery</code> when <code>boot</code> cannot be loaded.
+
+The mainline RK3288 reboot modes match it: <code>recovery</code>, <code>bootloader</code> (fastboot) and <code>loader</code> (rockusb), as in <code>systemctl reboot --reboot-argument=recovery</code>. They need a kernel patch: the RC5T619 restart handler power-cycles the SoC, which clears the reboot-mode register, so it is skipped for reboots into a mode.
+
+== Hardware ==
+{| class="wikitable"
+! Part !! Chip !! Mainline driver
+|-
+| PMIC || Ricoh RC5T619 || rn5t618
+|-
+| CPU/GPU regulators || Silergy SYR827 (I²C0, 0x40) / SYR828 (0x41) || fan53555; CPU DVFS 126 MHz–1.6 GHz
+|-
+| GPU || Mali-T764 || panfrost (Phosh renders with GLES 3.1)
+|-
+| Charger, fuel gauge || RC5T619 || rn5t618-power; a udev rule raises the 500 mA adapter limit to 2 A
+|-
+| Panel || 1920x1200 MIPI DSI, 4 lanes || panel-simple (patch)
+|-
+| Touchscreen || VTL CT365 (I²C4, 0x01) || vtl-ct36x (new driver)
+|-
+| WiFi || Broadcom BCM43362 (SDIO) || brcmfmac, NVRAM from Android (nvram_RK901.txt)
+|-
+| Power key || RC5T619 PWRON pin || rn5t618-pwrkey (new driver)
+|-
+| Volume keys || SARADC ch1 || adc-keys
+|-
+| Hall sensor || GPIO0_A6 || gpio-keys (SW_LID)
+|}
+
+== See also ==
+* {{MR|...|pmaports}} Initial merge request
+* Port notes and story: https://github.com/tbarbette/archos-oxygen101-pmos

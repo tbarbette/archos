@@ -1,0 +1,20 @@
+maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
+pkgname=firmware-archos-oxygen101
+pkgver=1
+pkgrel=0
+pkgdesc="WiFi NVRAM for Archos 101 Oxygen"
+url="https://github.com/tbarbette/firmware-archos-oxygen101"
+arch="armv7"
+license="proprietary"
+options="!check !strip !archcheck !tracedeps pmb:cross-native"
+_commit="8c180ed200bcb01b776229d920bd152cfa1f2bb0"
+source="$pkgname-$_commit.tar.gz::$url/archive/$_commit.tar.gz"
+builddir="$srcdir/$pkgname-$_commit"
+
+package() {
+	install -Dm644 "brcmfmac43362-sdio.archos,oxygen101.txt" \
+		"$pkgdir/usr/lib/firmware/brcm/brcmfmac43362-sdio.archos,oxygen101.txt"
+}
+
+sha512sums="
+"

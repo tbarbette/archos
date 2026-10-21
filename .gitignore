@@ -1,0 +1,10 @@
+# Full eMMC dump of the owner's tablet: contains their Android data
+/backup/
+# Images are published as release assets, not in git
+/release/*.img
+/release/*.img.xz
+/release/apks/
+# Published as its own repository
+/firmware-archos-oxygen101/
+.DS_Store
+__pycache__/

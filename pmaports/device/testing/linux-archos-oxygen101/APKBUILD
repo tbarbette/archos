@@ -1,0 +1,97 @@
+maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
+pkgname=linux-archos-oxygen101
+pkgver=6.12.90
+pkgrel=9
+pkgdesc="Mainline kernel for the Archos 101 Oxygen (RK3288)"
+arch="armv7"
+_carch="arm"
+_flavor="${pkgname#linux-}"
+url="https://kernel.org"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps
+	pmb:cross-native
+"
+makedepends="
+	bison
+	clang
+	findutils
+	flex
+	lld
+	llvm
+	openssl-dev
+	perl
+	postmarketos-installkernel
+	xz
+	zstd
+"
+_config="config-$_flavor.$arch"
+case $pkgver in
+	*.*.*)	_kernver=${pkgver%.0};;
+	*.*)	_kernver=$pkgver;;
+esac
+source="
+	https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${pkgver//_/-}.tar.xz
+	$_config
+	veyron.better_clock_selection_logic_and_dts_rate_list.patch
+	veyron.dts_allow_dedicating_npll_to_vop.patch
+	veyron.dts_do_dedicate_npll_to_vop.patch
+	veyron.ignore-gpt-ignoreme.patch
+	veyron.support_dedicating_npll_to_vop.patch
+	0001-archos-oxygen101-dts-and-panel.patch
+	0002-input-vtl-ct36x-touchscreen.patch
+	0003-archos-oxygen101-keys.patch
+	0004-archos-oxygen101-io-domains-touch-supply.patch
+	0005-input-rn5t618-pwrkey.patch
+	0006-archos-oxygen101-emmc-io-domain.patch
+	0007-mfd-rn5t618-keep-reboot-mode.patch
+	0008-archos-oxygen101-cpu-gpu-supplies.patch
+"
+builddir="$srcdir/linux-$_kernver"
+
+prepare() {
+	default_prepare
+	cp "$srcdir/config-$_flavor.$CARCH" .config
+	make ARCH="$_carch" LLVM=1 olddefconfig
+}
+
+build() {
+	unset LDFLAGS
+	make ARCH="$_carch" LLVM=1 \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-$_flavor"
+}
+
+package() {
+	mkdir -p "$pkgdir"/boot
+
+	make zinstall modules_install dtbs_install \
+		ARCH="$_carch" \
+		LLVM=1 \
+		INSTALL_PATH="$pkgdir"/boot/ \
+		INSTALL_MOD_PATH="$pkgdir"/usr \
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir/boot/dtbs"
+
+	rm -f "$pkgdir"/usr/lib/modules/*/build \
+		"$pkgdir"/usr/lib/modules/*/source
+
+	install -D "$builddir"/include/config/kernel.release \
+		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
+}
+
+sha512sums="
+8b909649740677cebb8876f61c6dcfe5646f5d4acd1a8141830a1ec21e5eedf8b0c678f37df13a5733f21c2ef137faf81ed09407d7bdc1dca35b134233f71317  linux-6.12.90.tar.xz
+a1a524ca3dc2588e6a6292f0cccb18b163f884d0d76eed1f79df2aa9fbae18746fe7bc26d1a0b75391241b96506b9a297ad7bd45994f3562ba0129ee206ec5f0  config-archos-oxygen101.armv7
+4f74aa47f8296c03db33ed808c3f7609a87a6109abff6efb47abfaff14d68f57cb05ad5fbb255dc00541b08c0853b241554defc43513f4eb5a4709de952b0e89  veyron.better_clock_selection_logic_and_dts_rate_list.patch
+cec81f88da19dc928c54780bf1d39efdf23dee481bc1a3a81cb17f506328103221ef47ee020f5e5b393f20fc20242937698cb733aa376e5d79a75b98c486e513  veyron.dts_allow_dedicating_npll_to_vop.patch
+f4336cc18991a01a7d532610758c640d633d1f7ac05e42c229da418eeed109c67c721d6ed5eea593d36178fb8b420dcbd2c0759876358081c669919192330cec  veyron.dts_do_dedicate_npll_to_vop.patch
+67f49d49457eed7ae2de4582d53602743dc9c785720527d713e9b14a027a4716c755cf56e5188641cb69b35c5a561f298fa4cf2b37751696768e76e534139f40  veyron.ignore-gpt-ignoreme.patch
+c7b8655eff9cce714f9c44c13261750e37ca401930e46f8a57e60dc328927ba2163216a5c66444b9bb51c786daaf4a63f08469e97b24da8d3f28fc8f784269d4  veyron.support_dedicating_npll_to_vop.patch
+24156653933e9d1924968fff6155949b5fa5cf5c6ce65a82f8627052501bcccd490cecd1b01d88505e05898deedff4fc459ada5bb984c337c416409c434471f0  0001-archos-oxygen101-dts-and-panel.patch
+8c2919b3809aa742dd372452dec2077c297e455f042963f43147ad69bd5090d9fc23075fc766840a57b9d0aa3b1c31019e827b0c560fcfe2d7805430a589dba5  0002-input-vtl-ct36x-touchscreen.patch
+300c7531c7ffa75fd3428dcdc7d4658f4dc343edd1395e1ec765a25781fb7aefc1bcbb52bc7b19b213ccef0793511992d7bb09089ff00c2539bba46b9398d92b  0003-archos-oxygen101-keys.patch
+e3a66cb93f055818b3f9a58a5bc3f16991c7d463c7ce25a670babce5d159fad6b5646379f0f1f168fdd82f457ad10e1e9cbad2380f12d3d80b2174c9e492ba84  0004-archos-oxygen101-io-domains-touch-supply.patch
+f5dd5e3f79a8e0250b6b19a28e694a4ba3156b7dae99008822d013461a0a1b818aa74849b73133bc6d8f9d8340d9f4f52d8e6e658a29c0f49e668a940ab10f1c  0005-input-rn5t618-pwrkey.patch
+e9da3005d2844030e1f133baff9b406409af139d10d166f23dcbb0ee17702edbed9418fec3ae6fab559bd475dfd9123a9702b6cfed8bba307224a954a7f9d20a  0006-archos-oxygen101-emmc-io-domain.patch
+540267f61e4a06f5791defc956615f6bebcb00bec7689e729c51e63e36fe5b1cc73a58c02e962233de7f83b26eceead4662bb631145f6d7024257a386977c9d3  0007-mfd-rn5t618-keep-reboot-mode.patch
+2da792f2bf0fc3eaac13a830a2348e6d9e408f2172b64e94c4294fffb29048eec1a46ac9cd1536a8a052cda750afb4e9bb3175e0576b6bb2c8f686d68c6d3b9b  0008-archos-oxygen101-cpu-gpu-supplies.patch
+"

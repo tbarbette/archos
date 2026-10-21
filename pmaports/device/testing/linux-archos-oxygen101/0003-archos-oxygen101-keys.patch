@@ -1,0 +1,57 @@
+--- a/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts
++++ b/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts
+@@ -80,11 +80,41 @@
+ 		num-interpolated-steps = <255>;
+ 		default-brightness-level = <200>;
+ 		power-supply = <&vcc_sys>;
++	};
++
++	adc-keys {
++		compatible = "adc-keys";
++		io-channels = <&saradc 1>;
++		io-channel-names = "buttons";
++		keyup-threshold-microvolt = <1800000>;
++		poll-interval = <100>;
++
++		button-volume-up {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			press-threshold-microvolt = <0>;
++		};
++
++		button-volume-down {
++			label = "Volume Down";
++			linux,code = <KEY_VOLUMEDOWN>;
++			press-threshold-microvolt = <300000>;
++		};
+ 	};
+ 
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwr_key>;
+ 
++		power-key {
++			label = "Power";
++			gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
++			debounce-interval = <20>;
++			wakeup-source;
++		};
++
+ 		lid-switch {
+ 			label = "Hall sensor";
+ 			gpios = <&gpio0 RK_PA6 GPIO_ACTIVE_LOW>;
+@@ -344,6 +374,12 @@
+ };
+ 
+ &pinctrl {
++	keys {
++		pwr_key: pwr-key {
++			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
+ 	touchscreen {
+ 		ts_int: ts-int {
+ 			rockchip,pins = <7 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;

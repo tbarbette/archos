@@ -1,0 +1,7 @@
+# RC5T619 charger: the power-on defaults (500 mA from the wall adapter) are
+# below what the tablet draws with the screen on, so it discharges while
+# plugged in. Use the 2 A of the stock adapter and the stock 1.5 A charge
+# current. The PMIC resets the limit when it re-detects the adapter, so apply
+# it again on every change the charger interrupt reports.
+ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-adp", ATTR{input_current_limit}="2000000"
+ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-battery", ATTR{charge_control_limit}="1500000"
