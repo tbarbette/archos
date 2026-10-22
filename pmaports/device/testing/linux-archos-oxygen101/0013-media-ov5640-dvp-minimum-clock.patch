@@ -1,0 +1,97 @@
+media: ov5640: keep the parallel clock above 40 MHz
+
+With 8-bit raw output at 1280x720 and 15 fps the driver programs a 84 MHz
+system clock. At that rate the black level calibration reads garbage
+(0x402c-0x4033 stuck at 0x1ff8): frames are black until the gain is high
+enough to clip, and the auto exposure oscillates. 30 fps (170 MHz) works.
+
+For such modes run the clock at an integer multiple of the needed rate and
+make the frame taller (VTS) by the same factor, so the frame rate is still
+the one requested and longer exposures become possible.
+
+--- a/drivers/media/i2c/ov5640.c
++++ b/drivers/media/i2c/ov5640.c
+@@ -41,6 +41,13 @@
+ #define OV5640_MIN_VBLANK	24
+ #define OV5640_MAX_VTS		3375
+ 
++/*
++ * Below this parallel bus clock (a system clock of 160 MHz) the black level
++ * calibration fails and the sensor outputs black frames, e.g. 8-bit raw
++ * 1280x720 at 15 fps. Such modes run the clock faster with a taller frame.
++ */
++#define OV5640_DVP_MIN_RATE	40000000
++
+ #define OV5640_DEFAULT_SLAVE_ID 0x3c
+ 
+ #define OV5640_LINK_RATE_MAX		490000000U
+@@ -1547,6 +1554,27 @@
+ 	return ov5640_write_reg(sensor, OV5640_REG_PCLK_PERIOD, pclk_period);
+ }
+ 
++/* Factor applied to the frame height to keep the DVP clock fast enough */
++static unsigned int ov5640_dvp_vts_scale(struct ov5640_dev *sensor)
++{
++	const struct ov5640_mode_info *mode = sensor->current_mode;
++	const struct ov5640_timings *timings = &mode->dvp_timings;
++	u32 vts = mode->height + timings->vblank_def;
++	unsigned int scale = 1;
++	u64 rate;
++
++	rate = (u64)timings->htot * (timings->crop.height + timings->vblank_def);
++	rate *= ov5640_framerates[sensor->current_fr];
++	rate *= ov5640_code_to_bpp(sensor, sensor->fmt.code);
++	do_div(rate, sensor->ep.bus.parallel.bus_width);
++
++	while (rate * scale < OV5640_DVP_MIN_RATE &&
++	       vts * (scale + 1) <= OV5640_MAX_VTS)
++		scale++;
++
++	return scale;
++}
++
+ static u32 ov5640_calc_pixel_rate(struct ov5640_dev *sensor)
+ {
+ 	const struct ov5640_mode_info *mode = sensor->current_mode;
+@@ -1556,7 +1584,7 @@
+ 	rate = timings->htot * (timings->crop.height + timings->vblank_def);
+ 	rate *= ov5640_framerates[sensor->current_fr];
+ 
+-	return rate;
++	return rate * ov5640_dvp_vts_scale(sensor);
+ }
+ 
+ static unsigned long ov5640_calc_pclk(struct ov5640_dev *sensor,
+@@ -1651,6 +1679,7 @@
+ 	const struct ov5640_timings *timings;
+ 	const struct v4l2_rect *analog_crop;
+ 	const struct v4l2_rect *crop;
++	u32 vts;
+ 	int ret;
+ 
+ 	if (sensor->fmt.code == MEDIA_BUS_FMT_JPEG_1X8) {
+@@ -1703,8 +1732,11 @@
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	ret = ov5640_write_reg16(sensor, OV5640_REG_TIMING_VTS,
+-				 mode->height + timings->vblank_def);
++	vts = mode->height + timings->vblank_def;
++	if (!ov5640_is_csi2(sensor))
++		vts *= ov5640_dvp_vts_scale(sensor);
++
++	ret = ov5640_write_reg16(sensor, OV5640_REG_TIMING_VTS, vts);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -2884,7 +2916,9 @@
+ 		__v4l2_ctrl_s_ctrl_int64(sensor->ctrls.pixel_rate,
+ 					 ov5640_calc_pixel_rate(sensor));
+ 
+-		__v4l2_ctrl_vblank_update(sensor, timings->vblank_def);
++		vblank = (mode->height + timings->vblank_def) *
++			 ov5640_dvp_vts_scale(sensor) - mode->height;
++		__v4l2_ctrl_vblank_update(sensor, vblank);
+ 
+ 		return 0;
+ 	}

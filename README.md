@@ -25,10 +25,11 @@ See [STORY.md](STORY.md) for how this port came to be.
 | Reboot to recovery/loader | ✅ | `syscon-reboot-mode`; PMIC re-power skipped for mode reboots |
 | Audio: speaker, internal mic | ✅ | RT5640 (`rt5640` + `simple-audio-card`), UCM profile in the device package |
 | Audio: headphones | 🧪 | jack sense on GPIO7_A7 |
-| Accelerometer, gyroscope (MPU-6050) | ✅ | `inv_mpu6050`; screen rotation needs the mount matrix |
+| Accelerometer, gyroscope (MPU-6050) | ✅ | `inv_mpu6050` with mount matrix; screen rotation works |
 | Magnetometer (AK8963) | ✅ | `ak8975` |
 | Lid (hall sensor) | 🧪 | `SW_LID` on GPIO0_A6 |
-| Camera (OV5640, parallel) | ❌ | no RK3288 camera interface driver in mainline |
+| Back camera (OV5640, parallel) | ✅ | `rkisp1` with RK3288 support + `ov5640` clock fix; libcamera, Snapshot |
+| Front camera (OV2659) | ❌ | held in power-down; shares the parallel bus |
 | Ambient light (US5151) | ❌ | no mainline driver |
 | USB host (`dwc2` ff540000) | ❌ | soft reset timeout |
 
@@ -42,7 +43,7 @@ See [STORY.md](STORY.md) for how this port came to be.
 | `firmware-archos-oxygen101/` | separate git repo with the WiFi NVRAM, to publish (the firmware package downloads from it) |
 | `kernel/` | the device tree and touchscreen driver as plain files (also in the kernel patches) |
 | `scripts/` | the commands used on the Mac as reusable scripts (find the tablet, status, flash, build, secure SSH), and the full command log |
-| `tools/` | `mkrkboot.py` (Rockchip boot.img), `mkrkupdate.py` (RKAF update.img / RK CRC32), register and touch debug scripts |
+| `tools/` | `mkrkboot.py` (Rockchip boot.img), `mkrkupdate.py` (RKAF update.img / RK CRC32), register and touch debug scripts, `camera/` capture and OV5640 register-dump scripts |
 | `release/` | prebuilt images (see below; not in git, published as release files) |
 | `wiki/` | draft page for wiki.postmarketos.org |
 | `upstream/` | pmaports merge request patch and checklist |

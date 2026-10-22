@@ -7,6 +7,7 @@
 /dts-v1/;
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/media/video-interfaces.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/pwm/pwm.h>
@@ -70,6 +71,53 @@
 		gpio = <&gpio0 RK_PB6 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		vin-supply = <&vcc_5v>;
+	};
+
+	/* Both cameras; the stock kernel calls the enable "pwen" */
+	vcc_camera: regulator-vcc-camera {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_camera";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		vin-supply = <&vcc_sys>;
+	};
+
+	isp: isp@ff910000 {
+		compatible = "rockchip,rk3288-cif-isp";
+		reg = <0x0 0xff910000 0x0 0x4000>;
+		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cru SCLK_ISP>, <&cru ACLK_ISP>, <&cru HCLK_ISP>,
+			 <&cru PCLK_ISP_IN>, <&cru SCLK_ISP_JPE>;
+		clock-names = "isp", "aclk", "hclk", "pclk", "jpe";
+		iommus = <&isp_mmu>;
+		power-domains = <&power RK3288_PD_VIO>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&isp_dvp>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@1 {
+				reg = <1>;
+
+				/*
+				 * The sensor's D9-D2 reach the ISP's D7-D0, the
+				 * low lines of its 12-line bus; polarities as
+				 * the stock kernel programs them.
+				 */
+				isp_parallel_in: endpoint {
+					remote-endpoint = <&ov5640_out>;
+					bus-type = <MEDIA_BUS_TYPE_PARALLEL>;
+					bus-width = <12>;
+					hsync-active = <1>;
+					vsync-active = <0>;
+					pclk-sample = <1>;
+				};
+			};
+		};
 	};
 
 	sound {
@@ -471,7 +519,58 @@
 	};
 };
 
+&gpio2 {
+	/* Front camera (OV2659): keep it off the shared parallel bus */
+	ov2659-powerdown-hog {
+		gpio-hog;
+		gpios = <RK_PB6 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "ov2659-powerdown";
+	};
+};
+
+&i2c3 {
+	status = "okay";
+
+	/* Back camera */
+	camera@3c {
+		compatible = "ovti,ov5640";
+		reg = <0x3c>;
+		clocks = <&cru SCLK_VIP_OUT>;
+		clock-names = "xclk";
+		assigned-clocks = <&cru SCLK_VIP_OUT>;
+		assigned-clock-parents = <&xin24m>;
+		assigned-clock-rates = <24000000>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&isp_clkout>;
+		powerdown-gpios = <&gpio2 RK_PB7 GPIO_ACTIVE_HIGH>;
+		AVDD-supply = <&vcc_camera>;
+		DVDD-supply = <&vcc_camera>;
+		DOVDD-supply = <&vcc_camera>;
+		/* On the back, upright in landscape */
+		orientation = <1>;
+		rotation = <0>;
+
+		port {
+			/* Gives the stock POLARITY_CTRL00 value, 0x20 */
+			ov5640_out: endpoint {
+				remote-endpoint = <&isp_parallel_in>;
+				bus-type = <MEDIA_BUS_TYPE_PARALLEL>;
+				bus-width = <8>;
+				data-shift = <2>;
+				hsync-active = <0>;
+				vsync-active = <1>;
+				pclk-sample = <1>;
+			};
+		};
+	};
+};
+
 &i2s {
+	status = "okay";
+};
+
+&isp_mmu {
 	status = "okay";
 };
 
@@ -493,6 +592,31 @@
 		i2c2_xfer_pu: i2c2-xfer-pu {
 			rockchip,pins = <6 RK_PB1 1 &pcfg_pull_up>,
 					<6 RK_PB2 1 &pcfg_pull_up>;
+		};
+	};
+
+	isp {
+		/*
+		 * D0-D7, vsync, href, pixel clock. D8-D11 stay GPIOs so the
+		 * ISP reads them as 0: D8/D9 are pulled up, D10/D11 are the
+		 * cameras' power-down lines.
+		 */
+		isp_dvp: isp-dvp {
+			rockchip,pins = <2 RK_PB4 1 &pcfg_pull_none>,
+					<2 RK_PB5 1 &pcfg_pull_none>,
+					<2 RK_PA0 1 &pcfg_pull_none>,
+					<2 RK_PA1 1 &pcfg_pull_none>,
+					<2 RK_PA2 1 &pcfg_pull_none>,
+					<2 RK_PA3 1 &pcfg_pull_none>,
+					<2 RK_PA4 1 &pcfg_pull_none>,
+					<2 RK_PA5 1 &pcfg_pull_none>,
+					<2 RK_PB0 1 &pcfg_pull_none>,
+					<2 RK_PB1 1 &pcfg_pull_none>,
+					<2 RK_PB2 1 &pcfg_pull_none>;
+		};
+
+		isp_clkout: isp-clkout {
+			rockchip,pins = <2 RK_PB3 1 &pcfg_pull_none>;
 		};
 	};
 

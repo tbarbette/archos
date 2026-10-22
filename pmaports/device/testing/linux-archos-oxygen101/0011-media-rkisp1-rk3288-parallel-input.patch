@@ -1,0 +1,237 @@
+media: rkisp1: support RK3288, and sensors on the low lines of the bus
+
+The ISP of the RK3288 is the same V10 block as the RK3399's. Add it,
+with its pixel input and JPEG/second core clocks, and without the MIPI
+receiver, which needs a D-PHY driver.
+
+The parallel input is MSB aligned: in the 8 and 10-bit modes the samples
+come from the top lines of the 12-line bus. On the Archos 101 Oxygen the
+OV5640's 8 data lines go to the ISP's D7-D0 instead. Read such a sensor
+at the endpoint's full bus-width, and scale the samples back up with the
+sensor de-gamma curve by default; userspace parameters can still
+replace that curve.
+
+On 32-bit ARM the IOMMU DMA mapping code splits imported buffers into
+segments of the device's maximum size (64 KiB by default) placed anywhere
+in the address space, and vb2-dma-contig then rejects them. Allow a single
+segment.
+
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h	2026-10-21 21:24:42
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h	2026-10-21 22:18:49
+@@ -175,6 +175,8 @@
+  * @sd:			a pointer to v4l2_subdev struct of the sensor
+  * @pixel_rate_ctrl:	pixel rate of the sensor, used to initialize the phy
+  * @port:		port number (0: MIPI, 1: Parallel)
++ * @bus_width:		parallel bus: number of data lines of the ISP endpoint
++ * @data_shift:		parallel bus: number of unused data lines below the data
+  */
+ struct rkisp1_sensor_async {
+ 	struct v4l2_async_connection asd;
+@@ -186,6 +188,8 @@
+ 	struct v4l2_subdev *sd;
+ 	struct v4l2_ctrl *pixel_rate_ctrl;
+ 	unsigned int port;
++	unsigned int bus_width;
++	unsigned int data_shift;
+ };
+ 
+ /*
+@@ -222,6 +226,7 @@
+ 	struct media_pad pads[RKISP1_ISP_PAD_MAX];
+ 	const struct rkisp1_mbus_info *sink_fmt;
+ 	__u32 frame_sequence;
++	unsigned int input_shift;
+ };
+ 
+ /*
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c	2026-10-21 21:24:42
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c	2026-10-22 08:32:03
+@@ -274,6 +274,8 @@
+ 			rk_asd->lanes = vep.bus.mipi_csi2.num_data_lanes;
+ 		} else {
+ 			rk_asd->mbus_flags = vep.bus.parallel.flags;
++			rk_asd->bus_width = vep.bus.parallel.bus_width;
++			rk_asd->data_shift = vep.bus.parallel.data_shift;
+ 		}
+ 
+ 		dev_dbg(rkisp1->dev, "registered ep id %d, bus type %u, %u lanes\n",
+@@ -515,6 +517,31 @@
+ 	.max_height = 2448,
+ };
+ 
++static const char * const rk3288_isp_clks[] = {
++	"isp",
++	"aclk",
++	"hclk",
++	"pclk",
++	"jpe",
++};
++
++static const struct rkisp1_isr_data rk3288_isp_isrs[] = {
++	{ NULL, rkisp1_isr, BIT(RKISP1_IRQ_ISP) | BIT(RKISP1_IRQ_MI) },
++};
++
++static const struct rkisp1_info rk3288_isp_info = {
++	.clks = rk3288_isp_clks,
++	.clk_size = ARRAY_SIZE(rk3288_isp_clks),
++	.isrs = rk3288_isp_isrs,
++	.isr_size = ARRAY_SIZE(rk3288_isp_isrs),
++	.isp_ver = RKISP1_V10,
++	.features = RKISP1_FEATURE_SELF_PATH
++		  | RKISP1_FEATURE_DUAL_CROP
++		  | RKISP1_FEATURE_BLS,
++	.max_width = 4416,
++	.max_height = 3312,
++};
++
+ static const char * const rk3399_isp_clks[] = {
+ 	"isp",
+ 	"aclk",
+@@ -568,6 +595,10 @@
+ 		.data = &px30_isp_info,
+ 	},
+ 	{
++		.compatible = "rockchip,rk3288-cif-isp",
++		.data = &rk3288_isp_info,
++	},
++	{
+ 		.compatible = "rockchip,rk3399-cif-isp",
+ 		.data = &rk3399_isp_info,
+ 	},
+@@ -606,6 +637,13 @@
+ 	ret = dma_set_mask_and_coherent(dev, dma_mask);
+ 	if (ret)
+ 		return ret;
++
++	/*
++	 * Imported buffers must map to a single contiguous range. The 32-bit
++	 * ARM IOMMU mapping code only merges scatterlist entries up to the
++	 * maximum segment size, 64 KiB by default.
++	 */
++	dma_set_max_seg_size(dev, UINT_MAX);
+ 
+ 	mutex_init(&rkisp1->stream_lock);
+ 
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c	2026-10-21 21:24:42
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c	2026-10-21 22:18:49
+@@ -202,7 +202,8 @@
+  */
+ static int rkisp1_config_isp(struct rkisp1_isp *isp,
+ 			     const struct v4l2_subdev_state *sd_state,
+-			     enum v4l2_mbus_type mbus_type, u32 mbus_flags)
++			     enum v4l2_mbus_type mbus_type, u32 mbus_flags,
++			     unsigned int bus_width, unsigned int data_shift)
+ {
+ 	struct rkisp1_device *rkisp1 = isp->rkisp1;
+ 	u32 isp_ctrl = 0, irq_mask = 0, acq_mult = 0, acq_prop = 0;
+@@ -253,11 +254,24 @@
+ 	}
+ 
+ 	/* Set up input acquisition properties */
++	isp->input_shift = 0;
+ 	if (mbus_type == V4L2_MBUS_BT656 || mbus_type == V4L2_MBUS_PARALLEL) {
+ 		if (mbus_flags & V4L2_MBUS_PCLK_SAMPLE_RISING)
+ 			acq_prop |= RKISP1_CIF_ISP_ACQ_PROP_POS_EDGE;
+ 
+-		switch (sink_fmt->bus_width) {
++		/*
++		 * The input is MSB aligned: the narrower modes drop the low
++		 * data lines. A sensor wired below the top line of a wider
++		 * bus (endpoint bus-width larger than the format's) is read
++		 * at the full width, and its samples are scaled back up by
++		 * the sensor de-gamma curve (see rkisp1_params_pre_configure()).
++		 */
++		if (bus_width > sink_fmt->bus_width &&
++		    bus_width > sink_fmt->bus_width + data_shift)
++			isp->input_shift = bus_width - sink_fmt->bus_width -
++					   data_shift;
++
++		switch (max(bus_width, sink_fmt->bus_width)) {
+ 		case 8:
+ 			acq_prop |= RKISP1_CIF_ISP_ACQ_PROP_IN_SEL_8B_ZERO;
+ 			break;
+@@ -341,11 +355,13 @@
+ /* Hardware configure Entry */
+ static int rkisp1_config_cif(struct rkisp1_isp *isp,
+ 			     struct v4l2_subdev_state *sd_state,
+-			     enum v4l2_mbus_type mbus_type, u32 mbus_flags)
++			     enum v4l2_mbus_type mbus_type, u32 mbus_flags,
++			     unsigned int bus_width, unsigned int data_shift)
+ {
+ 	int ret;
+ 
+-	ret = rkisp1_config_isp(isp, sd_state, mbus_type, mbus_flags);
++	ret = rkisp1_config_isp(isp, sd_state, mbus_type, mbus_flags,
++				bus_width, data_shift);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -924,6 +940,7 @@
+ 	struct media_pad *source_pad;
+ 	struct media_pad *sink_pad;
+ 	enum v4l2_mbus_type mbus_type;
++	unsigned int bus_width = 0, data_shift = 0;
+ 	u32 mbus_flags;
+ 	int ret;
+ 
+@@ -962,13 +979,16 @@
+ 
+ 		mbus_type = asd->mbus_type;
+ 		mbus_flags = asd->mbus_flags;
++		bus_width = asd->bus_width;
++		data_shift = asd->data_shift;
+ 	}
+ 
+ 	isp->frame_sequence = -1;
+ 
+ 	sd_state = v4l2_subdev_lock_and_get_active_state(sd);
+ 
+-	ret = rkisp1_config_cif(isp, sd_state, mbus_type, mbus_flags);
++	ret = rkisp1_config_cif(isp, sd_state, mbus_type, mbus_flags,
++				bus_width, data_shift);
+ 	if (ret)
+ 		goto out_unlock;
+ 
+--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c	2026-10-21 22:18:19
++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c	2026-10-21 22:18:49
+@@ -2243,6 +2243,30 @@
+ 	14
+ };
+ 
++/*
++ * Scale the input samples by 2^shift with the sensor de-gamma curve, for
++ * sensors wired below the top data line (see rkisp1_config_isp()). The 16
++ * segments of 16 cover 0-255, the input range of an 8-bit sensor read on
++ * the low lines of a 12-bit bus.
++ */
++static void rkisp1_sdg_scale(struct rkisp1_params *params, unsigned int shift)
++{
++	struct rkisp1_cif_isp_sdg_config sdg = { };
++	unsigned int i;
++
++	for (i = 0; i < RKISP1_CIF_ISP_DEGAMMA_CURVE_SIZE; i++) {
++		u16 y = min(i * (16U << shift), 4095U);
++
++		sdg.curve_r.gamma_y[i] = y;
++		sdg.curve_g.gamma_y[i] = y;
++		sdg.curve_b.gamma_y[i] = y;
++	}
++
++	rkisp1_sdg_config(params, &sdg);
++	rkisp1_param_set_bits(params, RKISP1_CIF_ISP_CTRL,
++			      RKISP1_CIF_ISP_CTRL_ISP_GAMMA_IN_ENA);
++}
++
+ void rkisp1_params_pre_configure(struct rkisp1_params *params,
+ 				 enum rkisp1_fmt_raw_pat_type bayer_pat,
+ 				 enum v4l2_quantization quantization,
+@@ -2273,6 +2297,9 @@
+ 			      rkisp1_hst_params_default_config.mode);
+ 
+ 	rkisp1_csm_config(params);
++
++	if (params->rkisp1->isp.input_shift)
++		rkisp1_sdg_scale(params, params->rkisp1->isp.input_shift);
+ 
+ 	spin_lock_irq(&params->config_lock);
+ 

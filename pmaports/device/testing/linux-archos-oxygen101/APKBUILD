@@ -1,7 +1,7 @@
 maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
 pkgname=linux-archos-oxygen101
 pkgver=6.12.90
-pkgrel=13
+pkgrel=21
 pkgdesc="Mainline kernel for the Archos 101 Oxygen (RK3288)"
 arch="armv7"
 _carch="arm"
@@ -47,6 +47,9 @@ source="
 	0008-archos-oxygen101-cpu-gpu-supplies.patch
 	0009-archos-oxygen101-audio-imu.patch
 	0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
+	0011-media-rkisp1-rk3288-parallel-input.patch
+	0012-archos-oxygen101-camera.patch
+	0013-media-ov5640-dvp-minimum-clock.patch
 "
 builddir="$srcdir/linux-$_kernver"
 
@@ -82,7 +85,7 @@ package() {
 
 sha512sums="
 8b909649740677cebb8876f61c6dcfe5646f5d4acd1a8141830a1ec21e5eedf8b0c678f37df13a5733f21c2ef137faf81ed09407d7bdc1dca35b134233f71317  linux-6.12.90.tar.xz
-cd43513637a46b7ba22d7179e5a726e1e60b143cc2f10d20a264b025a8d8a222dc7bc2b0e8106a532907b1ca604215adfbc084f74f35c4671061874499f7cf60  config-archos-oxygen101.armv7
+554fea72a93caf833d0b25ddaf39c9ad04f71dfe9e311d9a2317b34ea0c1cb371553e3255dfaafb403e54b5de26c0c8fb5922ded41f5f9aac4cf879a48ab82ad  config-archos-oxygen101.armv7
 4f74aa47f8296c03db33ed808c3f7609a87a6109abff6efb47abfaff14d68f57cb05ad5fbb255dc00541b08c0853b241554defc43513f4eb5a4709de952b0e89  veyron.better_clock_selection_logic_and_dts_rate_list.patch
 cec81f88da19dc928c54780bf1d39efdf23dee481bc1a3a81cb17f506328103221ef47ee020f5e5b393f20fc20242937698cb733aa376e5d79a75b98c486e513  veyron.dts_allow_dedicating_npll_to_vop.patch
 f4336cc18991a01a7d532610758c640d633d1f7ac05e42c229da418eeed109c67c721d6ed5eea593d36178fb8b420dcbd2c0759876358081c669919192330cec  veyron.dts_do_dedicate_npll_to_vop.patch
@@ -98,4 +101,7 @@ e9da3005d2844030e1f133baff9b406409af139d10d166f23dcbb0ee17702edbed9418fec3ae6fab
 2da792f2bf0fc3eaac13a830a2348e6d9e408f2172b64e94c4294fffb29048eec1a46ac9cd1536a8a052cda750afb4e9bb3175e0576b6bb2c8f686d68c6d3b9b  0008-archos-oxygen101-cpu-gpu-supplies.patch
 8164e75ba27aa4cb72f134a2670f291b8ba8ccf3b5fc6e3d62d81e23b6559f0676e697af4ea17c6bf3e61289a482e646d0caac04ea2e0845f3bbd18727c58362  0009-archos-oxygen101-audio-imu.patch
 0443f71ead1d5bc903c4508594276b2a837f277a502d069703365698d2fb09960a5d52cff408a1d63bc38a695880e0e75faf85c6c24030e8f035477fa6c9c543  0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
+de42503feb3b554cfa55b8e233eaaca1b9c26c705e1cb7d84c1eb412292eaeabe53b7bc42accb837ef1755a9eb4d391417368e92d2a1d6359442c290630a2b0a  0011-media-rkisp1-rk3288-parallel-input.patch
+2d0f0a8781f7f448ae3b7e6fb80c17abba37bc0a9d505d973be77e34e2fa165e0f5dc2ab1fa238106867f0a67347a0268af33f64e72809862de1a2176cb24bdf  0012-archos-oxygen101-camera.patch
+3ebe6c1600528719a9acf464008386643b0ad623c4dcdf3a21f77abe200a5da3d00a8b0691635efa4c41144b07509c2fe40605f960b1c2df8bf1b9dfed9c2615  0013-media-ov5640-dvp-minimum-clock.patch
 "

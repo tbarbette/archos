@@ -29,7 +29,7 @@
 | status_accel = Y
 | status_audio = Y
 | status_bluetooth =
-| status_camera = N
+| status_camera = P
 | status_gps =
 | status_mobiledata =
 | status_sms =
@@ -96,7 +96,7 @@ The mainline RK3288 reboot modes match it: <code>recovery</code>, <code>bootload
 |-
 | Magnetometer || AKM AK8963 (I²C1, 0x0d) || ak8975
 |-
-| Camera || OmniVision OV5640 (I²C3, 0x3c, parallel) || ov5640; no RK3288 camera interface driver
+| Camera || OmniVision OV5640 (I²C3, 0x3c, parallel) || ov5640 + rkisp1 (patched): back camera works with libcamera
 |-
 | Light sensor || UPI US5151 (I²C4, 0x10) || none
 |-

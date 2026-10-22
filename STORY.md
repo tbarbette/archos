@@ -337,12 +337,103 @@ or you're toying with me?"*
 ### Sensors and camera
 
 The MPU-6050 and the AK8963 came up with mainline's IIO drivers, and
-`iio-sensor-proxy` picked up the accelerometer. Screen rotation still needs a
-mount matrix, which takes holding the tablet in two positions.
+`iio-sensor-proxy` picked up the accelerometer. Screen rotation needed a
+mount matrix. I tried one live with a udev rule, and the owner reported the
+Y axis reversed ("if I look at my screen vertical it becomes flipped
+vertically"). The second try was right, and it went into the device tree
+(r13).
 
-The camera stops at the SoC. Mainline has an OV5640 driver, but no driver
-for RK3288's camera input: `rkisp1` knows RK3399, PX30 and i.MX8MP only, and
-the parallel camera interface has no RK3288 support either.
+The camera looked like it stopped at the SoC. Mainline has an OV5640 driver,
+but no driver for RK3288's camera input: `rkisp1` knows RK3399, PX30 and
+i.MX8MP only. That turned out to be the smaller problem.
+
+## The camera
+
+*"Go for the camera !"* That was the evening of the second day. It took
+the night and eight kernel builds (r14–r21).
+
+### The ISP is already in mainline, under another name
+
+RK3288's camera block is an ISP of the same generation (V10) as RK3399's,
+which `rkisp1` drives. Adding it took a compatible string, its clocks
+(including a second core clock, `sclk_isp_jpe`, that I left off in the first
+builds) and leaving out the MIPI receiver, which needs a D-PHY driver this
+board doesn't use. The OV5640 sits on a parallel (DVP) bus. The device tree
+got the ISP, its IOMMU, the sensor on I2C3, and the 2.8 V camera supply that
+the stock kernel calls "pwen".
+
+The first capture worked in the plumbing sense: frames arrived, no data lost.
+The colour-bar test pattern came through with the right hues. Real frames
+were nearly flat, and every input mode of the ISP gave the same picture.
+
+### The bus is wired to the wrong end
+
+The ISP's parallel input is MSB aligned: an 8-bit sensor is read on the top
+8 of its 12 data lines. On this board the OV5640's 8 lines go to D7–D0, the
+bottom ones. I found it by sampling the GPIO input register of the camera
+pads while streaming and seeing which lines toggled (`tools/camera/padsample.py`,
+`padhist.py`), then muxing lines off one at a time.
+
+The fix reads the full 12-bit bus with the four unused top lines at zero, so
+the 8 real bits land as a value 16 times too small. The ISP's sensor de-gamma
+stage, a 17-point curve, scales them back by 16 by default. Userspace
+parameters can still replace that curve.
+
+The colour bars had been no help here. Each bar is all ones or all zeros
+per channel, so any bit order shows the same colours. OV5640's *gradual*
+bars (register 0x503d = 0x88, written while streaming) are a ramp, and they
+proved the bit order right.
+
+### Is the camera even alive?
+
+Real frames were still featureless: the same flat field whether the tablet
+lay on the table or stood facing the room, with gain only amplifying an
+offset. Before going further I asked whether the camera had ever worked. The
+owner didn't know, so I rebooted into the stock Android (still in the
+`recovery` slot, rooted), and they opened the Camera app. It showed a
+picture. The hardware was fine.
+
+With Android previewing, I dumped every OV5640 register block over I2C
+(`notes/android-probe/ov5640-android-preview.txt`) and compared it with the
+same dump under pmOS (`ov5640-pmos-lowclock.txt`).
+
+### The clock was too slow
+
+Mainline's `ov5640` computes its PLL from the pixel rate the mode needs.
+For 8-bit raw at 1280×720 and 15 fps, that's a system clock of about 84 MHz.
+At that rate the sensor's black level calibration reads garbage: its result
+registers (0x402c–0x4033) sit at 0x1ff8 instead of around 0x0700. Every pixel
+is then pulled to black until the gain is high enough to clip, and auto
+exposure hunts. At 30 fps (170 MHz) the same mode showed the room.
+
+Patch 0013 keeps the parallel clock above 40 MHz: for slow modes the PLL
+runs at an integer multiple of the needed rate and the frame gets taller
+(VTS) by the same factor. The frame rate stays the one requested, and
+longer exposures become possible as a bonus. At 15 fps the calibration then
+reads 0x05b5 and exposure is stable.
+
+### libcamera and the 64 KiB segments
+
+The raw pipeline worked with `v4l2-ctl`. libcamera, which Snapshot (the
+GNOME camera app) uses, failed with "contiguous chunk is too small". It
+allocates frames as dmabufs and imports them into the ISP. On 32-bit ARM the
+ISP goes through the legacy ARM IOMMU code, which splits a mapping into
+chunks of the device's maximum segment size (64 KiB by default) placed
+anywhere in its address space. `vb2-dma-contig` then refuses the buffer. One
+line in the ISP's probe, `dma_set_max_seg_size(dev, UINT_MAX)`, fixed it.
+
+On the way I also enabled the DMA-BUF heaps (CMA, 128 MB) and gave the
+`video` group access to them with a udev rule. The default CMA heap is
+called `reserved`, not `linux,cma`, which cost a rebuild.
+
+With libcamera 0.7 and its `ov5640.yaml` tuning, Snapshot showed a preview
+and took photos. *"It works! Just mirrored horizontally."* The sensor isn't
+mirrored, as the raw frames match Android's. Snapshot mirrors the preview of
+any camera not known to face backwards, so the device tree now says so:
+`orientation = <1>` (back), `rotation = <0>`.
+
+Every test frame from that night shows the owner's home. None of them is in
+the repository.
 
 ## What it took
 
@@ -354,23 +445,28 @@ the parallel camera interface has no RK3288 support either.
 - About four hours on the second day, entirely over SSH on WiFi, to fix the
   power key, the battery and charging, the CPU and GPU, the eMMC and the
   reboot modes.
-- Thirteen kernel package builds (r0–r12) and ten kernel patches: the
+- A night for the camera, mostly over WiFi, with one trip into Android.
+- Twenty-two kernel package builds (r0–r21) and thirteen kernel patches: the
   device tree, the panel, the keys, the io-domains and touch supply, the
   power-key driver, the eMMC voltage fix, reboot-mode preservation, the
-  CPU/GPU supplies, audio and motion sensors, and an RK3288 clock flag. Two new input drivers (touchscreen, power key), one boot-deploy
-  hook, one udev rule, and small Python tools for Rockchip image formats and
-  register poking. About 540 shell commands on the Mac, all in
+  CPU/GPU supplies, audio and motion sensors, an RK3288 clock flag, RK3288
+  and low-wired parallel sensors in `rkisp1`, the camera device tree, and the
+  OV5640 clock floor. Two new input drivers (touchscreen, power key), one
+  boot-deploy hook, a few udev rules, and small Python tools for Rockchip
+  image formats, register poking and raw frames. About 540 shell commands on the Mac, all in
   `scripts/history/commands.md`.
 
 ## Still to do
 
-- Screen rotation: the accelerometer's mount matrix.
 - Headphone and headset mic test.
-- Camera: RK3288 support in a camera interface driver.
+- Camera: libcamera tuning for this module (a backlit room comes out dark),
+  and the front camera (OV2659).
+- USB networking doesn't always come back after a reboot; WiFi does.
 - The second USB host controller (`dwc2` at `ff540000`) times out on reset.
 - Light sensor (US5151) driver; test the lid sensor.
-- Upstreaming: the touchscreen and power-key drivers, the RC5T619 patches and
-  the device tree to the kernel, and the device to pmaports.
+- Upstreaming: the touchscreen and power-key drivers, the RC5T619 patches,
+  the `rkisp1` and `ov5640` patches and the device tree to the kernel, and
+  the device to pmaports.
 
 ## Appendix: the owner's prompts
 
@@ -457,3 +553,19 @@ acknowledgements like "Ok now" and "done" left out).
     was; the cable carries data.
 27. *"I heard a bip bip!"*, *"One longer bip?"*, *"Should I tell you or
     you're toying with me?"* → the speaker and loopback tests.
+28. *"The Y axis of the gyroscope is reversed. If I look at my screen
+    vertical it becomes flipped vertically"* → a second mount matrix, then
+    *"Good now. Wait before updating the kernel though. We'll batch with
+    something else."* → r13 built and held back.
+29. *"Why don't I have anything when I hit wifi settings?"*, *"Launch
+    again"*, *"Nope"* → the Settings app missed `XDG_CURRENT_DESKTOP`; still
+    to confirm.
+30. *"Go for the camera !"* → the camera chapter. The owner gave me the new
+    sudo password (kept in an environment variable, never in a file).
+31. *"I was on the normal pm as far as I can tell. Rebooted now and on PM"*,
+    *"It's holding vertical now"* → the flat frames weren't the table.
+32. *"I don't know indeed, you can reboot to android"* → the camera works in
+    Android, and the register dump that found the clock.
+33. *"It works! Just mirrored horizontally."* → `orientation = <1>`.
+34. *"free my CPU, i need to work right now"*, then *"Ok continue, but using
+    low CPU priority"* → the last build ran on 3 cores at nice 19.
