@@ -19,7 +19,7 @@ See [STORY.md](STORY.md) for how this port came to be.
 | microSD, eMMC | ✅ | rootfs on microSD |
 | Power key | ✅ | PMIC PWRON pin, new driver `rn5t618-pwrkey` |
 | Volume keys | ✅ | `adc-keys` (SARADC ch1) |
-| Battery, charging | ✅ | `rn5t618-power`; udev raises the 500 mA adapter limit to 2 A |
+| Battery, charging | ✅ | `rn5t618-power`; udev raises the 500 mA limits to 2 A (adapter) and 1.4 A (USB charger) |
 | CPU DVFS (126 MHz–1.6 GHz) | ✅ | SYR827 `vdd_cpu` |
 | GPU (Mali-T764, Panfrost) | ✅ | SYR828 `vdd_gpu`; Phosh renders with GLES |
 | Reboot to recovery/loader | ✅ | `syscon-reboot-mode`; PMIC re-power skipped for mode reboots |
@@ -28,7 +28,7 @@ See [STORY.md](STORY.md) for how this port came to be.
 | Accelerometer, gyroscope (MPU-6050) | ✅ | `inv_mpu6050` with mount matrix; screen rotation works |
 | Magnetometer (AK8963) | ✅ | `ak8975` |
 | Lid (hall sensor) | 🧪 | `SW_LID` on GPIO0_A6 |
-| Back camera (OV5640, parallel) | ✅ | `rkisp1` with RK3288 support + `ov5640` clock fix; libcamera, Snapshot |
+| Back camera (OV5640, parallel) | ✅ | `rkisp1` with RK3288 support + `ov5640` clock fix; libcamera (tuning file in the device package), Snapshot |
 | Front camera (OV2659) | ❌ | held in power-down; shares the parallel bus |
 | Ambient light (US5151) | ❌ | no mainline driver |
 | USB host (`dwc2` ff540000) | ❌ | soft reset timeout |

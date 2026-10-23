@@ -3,7 +3,7 @@ maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
 pkgname=device-archos-oxygen101
 pkgdesc="Archos 101 Oxygen"
 pkgver=2
-pkgrel=6
+pkgrel=7
 url="https://postmarketos.org"
 license="MIT"
 arch="armv7"
@@ -12,6 +12,7 @@ depends="
 	android-tools
 	linux-archos-oxygen101
 	postmarketos-base
+	v4l-utils
 "
 makedepends="devicepkg-dev"
 subpackages="$pkgname-nonfree-firmware:nonfree_firmware"
@@ -21,6 +22,7 @@ source="
 	90-device-archos-oxygen101.rules
 	ucm/archos-oxygen101.conf
 	ucm/HiFi.conf
+	ov5640.yaml
 "
 
 build() {
@@ -39,6 +41,11 @@ package() {
 	mkdir -p "$ucm"/conf.d/simple-card
 	ln -s ../../Rockchip/archos-oxygen101/archos-oxygen101.conf \
 		"$ucm/conf.d/simple-card/Archos 101 Oxygen.conf"
+
+	# libcamera tuning for the OV5640 as wired on this board; libcamera
+	# reads /etc/libcamera/ipa before its own files
+	install -Dm644 "$srcdir"/ov5640.yaml \
+		"$pkgdir"/etc/libcamera/ipa/rkisp1/ov5640.yaml
 }
 
 nonfree_firmware() {
@@ -50,7 +57,8 @@ nonfree_firmware() {
 sha512sums="
 f2e4b14f0e9f82a8cd7966532c12863449090ce8b61006d65d05f841cb2c580a22e35bdc2f0e7fcc296d3f46c13e6b6cbfa9dc17f58a0e149f3f1b64bff116a9  deviceinfo
 a5ff85175904e4af525914b66e5dbfc8591bd6548a149a2dc7f236e23597fe28784bfa73dce70057a46b6f314e8d4c0b0901b338e868470d9884b68b73770d13  rockchip-rsce-second.sh
-a4f11330576164b33a595cd5495b64f7022f3be9b29c78c7cdf1e945964081c0ec6a621bbc20be00973c0541939e63a20a1267540ed1c954f9d94312b2e66b7a  90-device-archos-oxygen101.rules
+e237cf13ba3a2ef2345cbcf210083f186d29e57c6f4969c8d1d10514d92d35c4fd28b3bf79db938fa700c4ea7e5878ad1d2c9d275b04b74e248472c512f59dca  90-device-archos-oxygen101.rules
 ed076e0b50031b490e6d948b4ddbc0636e3aea6aae5af3c7543d89bd731891d3394287341bfaddf42d42db3be66f691bdc4d8dfc88b8c692ae3448761e69c007  archos-oxygen101.conf
 3bed928623cbb556a139e8d7615452b5bb880b573b138707e51a6186854c43acf154a1cd36e543f09db17c6783597efcb13e33cb00c919619667564a7ad3f8c0  HiFi.conf
+d2403ba2014d8df761922535eda930fcab834e0b9d0d750ce64765144013abedee7afd5fde488d9193aa4fc6c00354e8e4ba885421e7dde37855af4a9a98fe72  ov5640.yaml
 "

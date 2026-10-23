@@ -432,8 +432,46 @@ mirrored, as the raw frames match Android's. Snapshot mirrors the preview of
 any camera not known to face backwards, so the device tree now says so:
 `orientation = <1>` (back), `rotation = <0>`.
 
+### The wiring, again: tuning
+
+The next morning I measured the picture instead of looking at it, with luma
+statistics of the last of 40–150 frames (`tools/camera/camstat.sh`,
+`camab.sh`). With libcamera's stock OV5640 tuning the brightest pixel was 81
+out of 235. The wiring was back, this time in userspace:
+
+- The tuning file programs the same de-gamma stage the kernel uses for the
+  ×16 scaling. Its curve assumes data on the top lines, so here it only
+  multiplied by 4 and white stopped at a quarter of full scale.
+- libcamera subtracts the sensor's black level, 0x10 at 10 bits, before that
+  curve. On the low lines that is 64 out of 255: a quarter of the range went
+  to black.
+- The tuning had no output gamma, so midtones stayed linear and dark.
+- The sensor's own auto exposure was still on, fighting libcamera's.
+
+The device package now installs an adapted `ov5640.yaml` in
+`/etc/libcamera/ipa/rkisp1/` (×16 curve, black level 4, gamma 2.2), and a
+udev rule turns the sensor's exposure and gain loops off. The same scene
+went from an average of 38 with nothing above 81 to an average of 110 with
+0.4% of the frame clipped.
+
 Every test frame from that night shows the owner's home. None of them is in
 the repository.
+
+## Loose ends
+
+**The Wi-Fi panel.** Phosh's Wi-Fi button opened nothing because of my own
+autologin: the greetd `initial_session` started `phosh-session` without
+`XDG_CURRENT_DESKTOP`, and GNOME Settings then hides its panels. Setting
+the variable in that command fixed it ("Wifi panel is ok"). The release
+image keeps the standard login screen, so it never had the problem.
+
+**Charging over USB.** The adapter input had been raised to 2 A on the
+second day, but the micro-USB input stayed at the PMIC's 500 mA default.
+With the screen on, the battery gained 8 mA. The PMIC already tells a
+charger (DCP) from a computer port (SDP), so a udev rule raises the limit
+to the driver's maximum of 1.4 A for chargers and charging ports only. The
+battery then took 800 mA, with the charger's voltage sagging to 4.3 V but
+holding.
 
 ## What it took
 
@@ -459,8 +497,8 @@ the repository.
 ## Still to do
 
 - Headphone and headset mic test.
-- Camera: libcamera tuning for this module (a backlit room comes out dark),
-  and the front camera (OV2659).
+- Camera: white balance and lens shading calibration for this module, and
+  the front camera (OV2659).
 - USB networking doesn't always come back after a reboot; WiFi does.
 - The second USB host controller (`dwc2` at `ff540000`) times out on reset.
 - Light sensor (US5151) driver; test the lid sensor.
@@ -558,8 +596,8 @@ acknowledgements like "Ok now" and "done" left out).
     *"Good now. Wait before updating the kernel though. We'll batch with
     something else."* → r13 built and held back.
 29. *"Why don't I have anything when I hit wifi settings?"*, *"Launch
-    again"*, *"Nope"* → the Settings app missed `XDG_CURRENT_DESKTOP`; still
-    to confirm.
+    again"*, *"Nope"* → the Settings app missed `XDG_CURRENT_DESKTOP`;
+    confirmed later: *"Wifi panel is ok"*.
 30. *"Go for the camera !"* → the camera chapter. The owner gave me the new
     sudo password (kept in an environment variable, never in a file).
 31. *"I was on the normal pm as far as I can tell. Rebooted now and on PM"*,
@@ -569,3 +607,7 @@ acknowledgements like "Ok now" and "done" left out).
 33. *"It works! Just mirrored horizontally."* → `orientation = <1>`.
 34. *"free my CPU, i need to work right now"*, then *"Ok continue, but using
     low CPU priority"* → the last build ran on 3 cores at nice 19.
+35. *"Wifi panel is ok. Update release image and story. Fix default camera
+    setting?"* → the tuning section, a new release image. Then *"Ok, done.
+    Also can you allow more chargeing through USB?"* (the tablet stood
+    facing the room for the measurements) → 1.4 A on USB chargers.

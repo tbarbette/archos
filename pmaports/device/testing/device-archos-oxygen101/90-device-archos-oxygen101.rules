@@ -5,7 +5,14 @@
 # it again on every change the charger interrupt reports.
 ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-adp", ATTR{input_current_limit}="2000000"
 ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-battery", ATTR{charge_control_limit}="1500000"
+# Same on USB, at the driver's 1.4 A maximum, when the PMIC detects a charger
+# (DCP) or a charging port (CDP); a computer port (SDP) stays at 500 mA.
+ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-usb", ATTR{usb_type}=="*[[]DCP[]]*|*[[]CDP[]]*", ATTR{input_current_limit}="1400000"
 
 # libcamera allocates frame buffers from the CMA heap, named "reserved" when
 # it is the default CMA area, and falls back to udmabuf when it can't open it.
 SUBSYSTEM=="dma_heap", KERNEL=="linux,cma|reserved", GROUP="video", MODE="0660"
+
+# libcamera runs the exposure and gain loop itself; the OV5640's own one would
+# fight it, and libcamera doesn't turn it off.
+ACTION=="add", SUBSYSTEM=="video4linux", KERNEL=="v4l-subdev*", ATTR{name}=="ov5640 *", RUN+="/usr/bin/v4l2-ctl -d $devnode --set-ctrl auto_exposure=1,gain_automatic=0"
