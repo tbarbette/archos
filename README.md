@@ -153,19 +153,3 @@ The stock loader is Rockchip's U-Boot 2014.04 (`rkdevelop`). For both
 It doesn't check signatures. `deviceinfo_bootimg_dtb_second` plus
 `rockchip-rsce-second.sh` (a `mkinitfs_postprocess` hook) produce that format
 from standard boot-deploy output.
-
-## The owner's tablet, as left
-
-- `boot`: postmarketOS (kernel r21, device package 2-r7), with autologin
-  into Phosh (`/etc/phrog/greetd-config.toml`, `[initial_session]`).
-- `recovery`: still the **rooted stock Android** boot image used for the
-  register comparisons, with a root shell service (`rk serve`, port 2323,
-  reachable through `adb forward`). Replace it with the pmOS `boot.img`
-  (`rkdeveloptool wl 0x26000 boot.img`) or the original recovery from the
-  backup.
-- Test leftovers in `/home/user`: `rk/`, `*.sh`, `ov5640-archos.yaml`, and
-  raw camera captures (`*.yuv`, `raw.bin`) that show the room. Delete them
-  with `rm -rf ~/rk ~/*.yuv ~/raw.bin ~/ov*.txt ~/ov5640-archos.yaml
-  ~/bayertest.sh ~/ovdump*.sh ~/camstat.sh ~/camab.sh`.
-- USB networking may not come back after a reboot; SSH works over WiFi.
-
