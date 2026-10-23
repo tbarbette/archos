@@ -1,6 +1,6 @@
-From 53f0752ce3d0209969f4730ba33b41a4bb9410de Mon Sep 17 00:00:00 2001
+From 4a313f97ccfdfc6017547e0247b40cad6cc12b57 Mon Sep 17 00:00:00 2001
 From: Tom Barbette <tom.barbette@uclouvain.be>
-Date: Wed, 21 Oct 2026 12:18:11 +0000
+Date: Fri, 23 Oct 2026 08:52:46 +0200
 Subject: [PATCH] archos-oxygen101: new device
 
 Archos 101 Oxygen (AC101OX), a 2015 RK3288 tablet. Mainline 6.12 based
@@ -10,15 +10,25 @@ RC5T619 reboot-mode handling. The stock Rockchip U-Boot is kept: the
 device package wraps the DTB into the RSCE "second" section it expects
 and writes new boot images to the eMMC.
 
-Tested: display, touch, WiFi, USB network, keys, battery and charging,
-CPU DVFS, GPU (Panfrost), reboot to recovery and loader.
+The back camera (OV5640, parallel bus) uses rkisp1 with RK3288 support
+added. The board wires the sensor to the low lines of the ISP's bus, so
+the kernel scales the samples in the sensor de-gamma stage, and the
+device package ships a libcamera tuning file adapted to that wiring.
+
+Tested: display, touch, WiFi, USB network, keys, battery and charging
+(adapter and USB), CPU DVFS, GPU (Panfrost), reboot to recovery and
+loader, speaker and internal microphone, accelerometer/gyroscope with
+screen rotation, magnetometer, back camera with Snapshot.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- .../90-device-archos-oxygen101.rules          |    7 +
- .../testing/device-archos-oxygen101/APKBUILD  |   44 +
+ .../90-device-archos-oxygen101.rules          |   18 +
+ .../testing/device-archos-oxygen101/APKBUILD  |   64 +
  .../device-archos-oxygen101/deviceinfo        |   42 +
+ .../device-archos-oxygen101/ov5640.yaml       |  260 +
  .../rockchip-rsce-second.sh                   |  112 +
+ .../device-archos-oxygen101/ucm/HiFi.conf     |   51 +
+ .../ucm/archos-oxygen101.conf                 |   10 +
  .../firmware-archos-oxygen101/APKBUILD        |   20 +
  .../0001-archos-oxygen101-dts-and-panel.patch |  461 +
  .../0002-input-vtl-ct36x-touchscreen.patch    |  314 +
@@ -28,18 +38,26 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  ...0006-archos-oxygen101-emmc-io-domain.patch |   11 +
  .../0007-mfd-rn5t618-keep-reboot-mode.patch   |   18 +
  ...08-archos-oxygen101-cpu-gpu-supplies.patch |   72 +
- .../testing/linux-archos-oxygen101/APKBUILD   |   97 +
- .../config-archos-oxygen101.armv7             | 8825 +++++++++++++++++
+ .../0009-archos-oxygen101-audio-imu.patch     |  150 +
+ ...p-rk3288-i2s0-clkout-set-rate-parent.patch |   21 +
+ ...1-media-rkisp1-rk3288-parallel-input.patch |  237 +
+ .../0012-archos-oxygen101-camera.patch        |  161 +
+ .../0013-media-ov5640-dvp-minimum-clock.patch |   97 +
+ .../testing/linux-archos-oxygen101/APKBUILD   |  107 +
+ .../config-archos-oxygen101.armv7             | 8827 +++++++++++++++++
  ...ck_selection_logic_and_dts_rate_list.patch |  456 +
  ...ron.dts_allow_dedicating_npll_to_vop.patch |   35 +
  .../veyron.dts_do_dedicate_npll_to_vop.patch  |   89 +
  .../veyron.ignore-gpt-ignoreme.patch          |  149 +
  ...eyron.support_dedicating_npll_to_vop.patch |  166 +
- 20 files changed, 11189 insertions(+)
+ 28 files changed, 12219 insertions(+)
  create mode 100644 device/testing/device-archos-oxygen101/90-device-archos-oxygen101.rules
  create mode 100644 device/testing/device-archos-oxygen101/APKBUILD
  create mode 100644 device/testing/device-archos-oxygen101/deviceinfo
+ create mode 100644 device/testing/device-archos-oxygen101/ov5640.yaml
  create mode 100644 device/testing/device-archos-oxygen101/rockchip-rsce-second.sh
+ create mode 100644 device/testing/device-archos-oxygen101/ucm/HiFi.conf
+ create mode 100644 device/testing/device-archos-oxygen101/ucm/archos-oxygen101.conf
  create mode 100644 device/testing/firmware-archos-oxygen101/APKBUILD
  create mode 100644 device/testing/linux-archos-oxygen101/0001-archos-oxygen101-dts-and-panel.patch
  create mode 100644 device/testing/linux-archos-oxygen101/0002-input-vtl-ct36x-touchscreen.patch
@@ -49,6 +67,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  create mode 100644 device/testing/linux-archos-oxygen101/0006-archos-oxygen101-emmc-io-domain.patch
  create mode 100644 device/testing/linux-archos-oxygen101/0007-mfd-rn5t618-keep-reboot-mode.patch
  create mode 100644 device/testing/linux-archos-oxygen101/0008-archos-oxygen101-cpu-gpu-supplies.patch
+ create mode 100644 device/testing/linux-archos-oxygen101/0009-archos-oxygen101-audio-imu.patch
+ create mode 100644 device/testing/linux-archos-oxygen101/0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
+ create mode 100644 device/testing/linux-archos-oxygen101/0011-media-rkisp1-rk3288-parallel-input.patch
+ create mode 100644 device/testing/linux-archos-oxygen101/0012-archos-oxygen101-camera.patch
+ create mode 100644 device/testing/linux-archos-oxygen101/0013-media-ov5640-dvp-minimum-clock.patch
  create mode 100644 device/testing/linux-archos-oxygen101/APKBUILD
  create mode 100644 device/testing/linux-archos-oxygen101/config-archos-oxygen101.armv7
  create mode 100644 device/testing/linux-archos-oxygen101/veyron.better_clock_selection_logic_and_dts_rate_list.patch
@@ -59,10 +82,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 diff --git a/device/testing/device-archos-oxygen101/90-device-archos-oxygen101.rules b/device/testing/device-archos-oxygen101/90-device-archos-oxygen101.rules
 new file mode 100644
-index 0000000000..0aac48e2b7
+index 0000000..d9094f2
 --- /dev/null
 +++ b/device/testing/device-archos-oxygen101/90-device-archos-oxygen101.rules
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,18 @@
 +# RC5T619 charger: the power-on defaults (500 mA from the wall adapter) are
 +# below what the tablet draws with the screen on, so it discharges while
 +# plugged in. Use the 2 A of the stock adapter and the stock 1.5 A charge
@@ -70,18 +93,29 @@ index 0000000000..0aac48e2b7
 +# it again on every change the charger interrupt reports.
 +ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-adp", ATTR{input_current_limit}="2000000"
 +ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-battery", ATTR{charge_control_limit}="1500000"
++# Same on USB, at the driver's 1.4 A maximum, when the PMIC detects a charger
++# (DCP) or a charging port (CDP); a computer port (SDP) stays at 500 mA.
++ACTION=="add|change", SUBSYSTEM=="power_supply", KERNEL=="rn5t618-usb", ATTR{usb_type}=="*[[]DCP[]]*|*[[]CDP[]]*", ATTR{input_current_limit}="1400000"
++
++# libcamera allocates frame buffers from the CMA heap, named "reserved" when
++# it is the default CMA area, and falls back to udmabuf when it can't open it.
++SUBSYSTEM=="dma_heap", KERNEL=="linux,cma|reserved", GROUP="video", MODE="0660"
++
++# libcamera runs the exposure and gain loop itself; the OV5640's own one would
++# fight it, and libcamera doesn't turn it off.
++ACTION=="add", SUBSYSTEM=="video4linux", KERNEL=="v4l-subdev*", ATTR{name}=="ov5640 *", RUN+="/usr/bin/v4l2-ctl -d $devnode --set-ctrl auto_exposure=1,gain_automatic=0"
 diff --git a/device/testing/device-archos-oxygen101/APKBUILD b/device/testing/device-archos-oxygen101/APKBUILD
 new file mode 100644
-index 0000000000..507256f60f
+index 0000000..82d650c
 --- /dev/null
 +++ b/device/testing/device-archos-oxygen101/APKBUILD
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,64 @@
 +# Reference: <https://postmarketos.org/devicepkg>
 +maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
 +pkgname=device-archos-oxygen101
 +pkgdesc="Archos 101 Oxygen"
-+pkgver=2
-+pkgrel=2
++pkgver=1
++pkgrel=0
 +url="https://postmarketos.org"
 +license="MIT"
 +arch="armv7"
@@ -90,6 +124,7 @@ index 0000000000..507256f60f
 +	android-tools
 +	linux-archos-oxygen101
 +	postmarketos-base
++	v4l-utils
 +"
 +makedepends="devicepkg-dev"
 +subpackages="$pkgname-nonfree-firmware:nonfree_firmware"
@@ -97,6 +132,9 @@ index 0000000000..507256f60f
 +	deviceinfo
 +	rockchip-rsce-second.sh
 +	90-device-archos-oxygen101.rules
++	ucm/archos-oxygen101.conf
++	ucm/HiFi.conf
++	ov5640.yaml
 +"
 +
 +build() {
@@ -107,6 +145,19 @@ index 0000000000..507256f60f
 +	devicepkg_package $startdir $pkgname
 +	install -Dm644 "$srcdir"/rockchip-rsce-second.sh \
 +		"$pkgdir"/usr/share/mkinitfs/rockchip-rsce-second.sh
++
++	# ALSA UCM profile for the RT5640 sound card
++	local ucm="$pkgdir"/usr/share/alsa/ucm2
++	install -Dm644 -t "$ucm"/Rockchip/archos-oxygen101 \
++		"$srcdir"/archos-oxygen101.conf "$srcdir"/HiFi.conf
++	mkdir -p "$ucm"/conf.d/simple-card
++	ln -s ../../Rockchip/archos-oxygen101/archos-oxygen101.conf \
++		"$ucm/conf.d/simple-card/Archos 101 Oxygen.conf"
++
++	# libcamera tuning for the OV5640 as wired on this board; libcamera
++	# reads /etc/libcamera/ipa before its own files
++	install -Dm644 "$srcdir"/ov5640.yaml \
++		"$pkgdir"/etc/libcamera/ipa/rkisp1/ov5640.yaml
 +}
 +
 +nonfree_firmware() {
@@ -118,11 +169,14 @@ index 0000000000..507256f60f
 +sha512sums="
 +f2e4b14f0e9f82a8cd7966532c12863449090ce8b61006d65d05f841cb2c580a22e35bdc2f0e7fcc296d3f46c13e6b6cbfa9dc17f58a0e149f3f1b64bff116a9  deviceinfo
 +a5ff85175904e4af525914b66e5dbfc8591bd6548a149a2dc7f236e23597fe28784bfa73dce70057a46b6f314e8d4c0b0901b338e868470d9884b68b73770d13  rockchip-rsce-second.sh
-+5ae5c1be52a652b52ee0828690cbf1089951e11ebaf928c88f2ff361c939b73e9def1e17d6be4190ba680233058299ef4005623a34005bd5e9f1945785957f43  90-device-archos-oxygen101.rules
++e237cf13ba3a2ef2345cbcf210083f186d29e57c6f4969c8d1d10514d92d35c4fd28b3bf79db938fa700c4ea7e5878ad1d2c9d275b04b74e248472c512f59dca  90-device-archos-oxygen101.rules
++ed076e0b50031b490e6d948b4ddbc0636e3aea6aae5af3c7543d89bd731891d3394287341bfaddf42d42db3be66f691bdc4d8dfc88b8c692ae3448761e69c007  archos-oxygen101.conf
++3bed928623cbb556a139e8d7615452b5bb880b573b138707e51a6186854c43acf154a1cd36e543f09db17c6783597efcb13e33cb00c919619667564a7ad3f8c0  HiFi.conf
++d2403ba2014d8df761922535eda930fcab834e0b9d0d750ce64765144013abedee7afd5fde488d9193aa4fc6c00354e8e4ba885421e7dde37855af4a9a98fe72  ov5640.yaml
 +"
 diff --git a/device/testing/device-archos-oxygen101/deviceinfo b/device/testing/device-archos-oxygen101/deviceinfo
 new file mode 100644
-index 0000000000..e2fbe88ac1
+index 0000000..e2fbe88
 --- /dev/null
 +++ b/device/testing/device-archos-oxygen101/deviceinfo
 @@ -0,0 +1,42 @@
@@ -168,9 +222,275 @@ index 0000000000..e2fbe88ac1
 +
 +# Rockchip Electronics Co., Ltd.
 +deviceinfo_usb_idVendor="0x2207"
+diff --git a/device/testing/device-archos-oxygen101/ov5640.yaml b/device/testing/device-archos-oxygen101/ov5640.yaml
+new file mode 100644
+index 0000000..66c8218
+--- /dev/null
++++ b/device/testing/device-archos-oxygen101/ov5640.yaml
+@@ -0,0 +1,260 @@
++# SPDX-License-Identifier: CC0-1.0
++# libcamera's ov5640.yaml, adapted to the Archos 101 Oxygen's camera wiring.
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - Agc:
++  - Awb:
++  - BlackLevelCorrection:
++      # Subtracted before the curve below, on the low lines: 0x10 at 10 bits
++      # is 4 there, written in 16-bit units.
++      R: 64
++      Gr: 64
++      Gb: 64
++      B: 64
++  - ColorProcessing:
++  - GammaOutCorrection:
++  - GammaSensorLinearization:
++      # The sensor's 8 data lines reach the ISP's D7-D0 (the low end of its
++      # 12-bit bus): stretch 0-255 to 0-4095.
++      x-intervals: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]
++      y:
++        red:   [ 0, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2304, 2560, 2816, 3072, 3328, 3584, 3840, 4095 ]
++        green: [ 0, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2304, 2560, 2816, 3072, 3328, 3584, 3840, 4095 ]
++        blue:  [ 0, 256, 512, 768, 1024, 1280, 1536, 1792, 2048, 2304, 2560, 2816, 3072, 3328, 3584, 3840, 4095 ]
++  - LensShadingCorrection:
++      x-size: [ 0.0625, 0.0625, 0.0625, 0.0625, 0.0625, 0.0625, 0.0625, 0.0625 ]
++      y-size: [ 0.0625, 0.0625, 0.0625, 0.0625, 0.0625, 0.0625, 0.0625, 0.0625 ]
++      sets:
++        - ct: 3000
++          r:  [
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++              ]
++          gr: [
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++              ]
++          gb: [
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++              ]
++          b:  [
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++                1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024,
++              ]
++        - ct: 7000
++          r:  [
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++              ]
++          gr: [
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++              ]
++          gb: [
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++              ]
++          b:  [
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++                1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536, 1536,
++              ]
++  - DefectPixelClusterCorrection:
++      fixed-set: false
++      sets:
++        # PG, LC, RO, RND, RG
++        - line-threshold:
++            green: 8
++            red-blue: 8
++          line-mad-factor:
++            green: 4
++            red-blue: 4
++          pg-factor:
++            green: 8
++            red-blue: 8
++          rnd-threshold:
++            green: 10
++            red-blue: 10
++          rg-factor:
++            green: 32
++            red-blue: 32
++          ro-limits:
++            green: 1
++            red-blue: 1
++          rnd-offsets:
++            green: 2
++            red-blue: 2
++        # PG, LC, RO
++        - line-threshold:
++            green: 24
++            red-blue: 32
++          line-mad-factor:
++            green: 16
++            red-blue: 24
++          pg-factor:
++            green: 6
++            red-blue: 8
++          ro-limits:
++            green: 2
++            red-blue: 2
++        # PG, LC, RO, RND, RG
++        - line-threshold:
++            green: 32
++            red-blue: 32
++          line-mad-factor:
++            green: 4
++            red-blue: 4
++          pg-factor:
++            green: 10
++            red-blue: 10
++          rnd-threshold:
++            green: 6
++            red-blue: 8
++          rg-factor:
++            green: 4
++            red-blue: 4
++          ro-limits:
++            green: 1
++            red-blue: 2
++          rnd-offsets:
++            green: 2
++            red-blue: 2
++  - Dpf:
++      DomainFilter:
++        g: [ 16, 16, 16, 16, 16, 16 ]
++        rb: [ 16, 16, 16, 16, 16, 16 ]
++      NoiseLevelFunction:
++        coeff: [
++          1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023,
++          1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023,
++          1023
++        ]
++        scale-mode: "linear"
++      FilterStrength:
++        r: 64
++        g: 64
++        b: 64
++  - Filter:
++...
 diff --git a/device/testing/device-archos-oxygen101/rockchip-rsce-second.sh b/device/testing/device-archos-oxygen101/rockchip-rsce-second.sh
 new file mode 100644
-index 0000000000..c0798db682
+index 0000000..c0798db
 --- /dev/null
 +++ b/device/testing/device-archos-oxygen101/rockchip-rsce-second.sh
 @@ -0,0 +1,112 @@
@@ -286,9 +606,82 @@ index 0000000000..c0798db682
 +cat "$tmp/boot.img" > "$bootimg"
 +
 +flash_boot
+diff --git a/device/testing/device-archos-oxygen101/ucm/HiFi.conf b/device/testing/device-archos-oxygen101/ucm/HiFi.conf
+new file mode 100644
+index 0000000..4c812b1
+--- /dev/null
++++ b/device/testing/device-archos-oxygen101/ucm/HiFi.conf
+@@ -0,0 +1,51 @@
++# Archos 101 Oxygen: Realtek RT5640 on I2S0. Speaker on SPOL/SPOR,
++# headphones on HPOL/HPOR (jack sense on GPIO7_A7), internal mic on IN1.
++# The headset mic (IN2, probably) has no jack sense and isn't tested.
++
++Define.HaveAif "1"
++Define.HaveSpeaker "yes"
++Define.HaveInternalMic "yes"
++Define.HaveHeadsetMic ""
++
++SectionVerb {
++	Include.e.File "/codecs/rt5640/EnableSeq.conf"
++
++	Value {
++		TQ "HiFi"
++		# Playback and capture share the I2S clock: keep them at one rate
++		PlaybackRate 48000
++		CaptureRate 48000
++	}
++}
++
++Include.spk.File "/codecs/rt5640/Speaker.conf"
++Include.mic.File "/codecs/rt5640/IN1-InternalMic.conf"
++
++
++# As codecs/rt5640/HeadPhones.conf, except for the jack control:
++# simple-audio-card names it after its "Headphones" pin
++SectionDevice."Headphones" {
++	Comment "Headphones"
++	ConflictingDevice [
++		"Speaker"
++	]
++	EnableSequence [
++		cset "name='HPO MIX HPVOL Switch' on"
++		cset "name='HP Channel Switch' on"
++		cset "name='HP L Playback Switch' on"
++		cset "name='HP R Playback Switch' on"
++	]
++	DisableSequence [
++		cset "name='HP Channel Switch' off"
++		cset "name='HP L Playback Switch' off"
++		cset "name='HP R Playback Switch' off"
++	]
++	Value {
++		PlaybackPriority 300
++		PlaybackPCM "hw:${CardId}"
++		JackControl "Headphones Jack"
++		PlaybackMixerElem "HP"
++		PlaybackVolume "HP Playback Volume"
++		PlaybackMasterElem "DAC1"
++	}
++}
+diff --git a/device/testing/device-archos-oxygen101/ucm/archos-oxygen101.conf b/device/testing/device-archos-oxygen101/ucm/archos-oxygen101.conf
+new file mode 100644
+index 0000000..695fefe
+--- /dev/null
++++ b/device/testing/device-archos-oxygen101/ucm/archos-oxygen101.conf
+@@ -0,0 +1,10 @@
++Syntax 6
++
++SectionUseCase."HiFi" {
++	File "/Rockchip/archos-oxygen101/HiFi.conf"
++	Comment "Play HiFi quality Music"
++}
++
++Include.card-init.File "/lib/card-init.conf"
++Include.ctl-remap.File "/lib/ctl-remap.conf"
++Include.codec-init.File "/codecs/rt5640/init.conf"
 diff --git a/device/testing/firmware-archos-oxygen101/APKBUILD b/device/testing/firmware-archos-oxygen101/APKBUILD
 new file mode 100644
-index 0000000000..94e3fed3aa
+index 0000000..94e3fed
 --- /dev/null
 +++ b/device/testing/firmware-archos-oxygen101/APKBUILD
 @@ -0,0 +1,20 @@
@@ -314,7 +707,7 @@ index 0000000000..94e3fed3aa
 +"
 diff --git a/device/testing/linux-archos-oxygen101/0001-archos-oxygen101-dts-and-panel.patch b/device/testing/linux-archos-oxygen101/0001-archos-oxygen101-dts-and-panel.patch
 new file mode 100644
-index 0000000000..2d54e3a050
+index 0000000..2d54e3a
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0001-archos-oxygen101-dts-and-panel.patch
 @@ -0,0 +1,461 @@
@@ -781,7 +1174,7 @@ index 0000000000..2d54e3a050
 + 	}, {
 diff --git a/device/testing/linux-archos-oxygen101/0002-input-vtl-ct36x-touchscreen.patch b/device/testing/linux-archos-oxygen101/0002-input-vtl-ct36x-touchscreen.patch
 new file mode 100644
-index 0000000000..f5d229233a
+index 0000000..f5d2292
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0002-input-vtl-ct36x-touchscreen.patch
 @@ -0,0 +1,314 @@
@@ -1101,7 +1494,7 @@ index 0000000000..f5d229233a
 ++MODULE_LICENSE("GPL");
 diff --git a/device/testing/linux-archos-oxygen101/0003-archos-oxygen101-keys.patch b/device/testing/linux-archos-oxygen101/0003-archos-oxygen101-keys.patch
 new file mode 100644
-index 0000000000..6e1e519a21
+index 0000000..6e1e519
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0003-archos-oxygen101-keys.patch
 @@ -0,0 +1,57 @@
@@ -1164,7 +1557,7 @@ index 0000000000..6e1e519a21
 + 			rockchip,pins = <7 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
 diff --git a/device/testing/linux-archos-oxygen101/0004-archos-oxygen101-io-domains-touch-supply.patch b/device/testing/linux-archos-oxygen101/0004-archos-oxygen101-io-domains-touch-supply.patch
 new file mode 100644
-index 0000000000..1c6d8a84fa
+index 0000000..1c6d8a8
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0004-archos-oxygen101-io-domains-touch-supply.patch
 @@ -0,0 +1,39 @@
@@ -1209,7 +1602,7 @@ index 0000000000..1c6d8a84fa
 + &saradc {
 diff --git a/device/testing/linux-archos-oxygen101/0005-input-rn5t618-pwrkey.patch b/device/testing/linux-archos-oxygen101/0005-input-rn5t618-pwrkey.patch
 new file mode 100644
-index 0000000000..9854240bd3
+index 0000000..9854240
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0005-input-rn5t618-pwrkey.patch
 @@ -0,0 +1,175 @@
@@ -1390,7 +1783,7 @@ index 0000000000..9854240bd3
 + 	case RN5T618_ILIMDATAH ... RN5T618_AIN0DATAL:
 diff --git a/device/testing/linux-archos-oxygen101/0006-archos-oxygen101-emmc-io-domain.patch b/device/testing/linux-archos-oxygen101/0006-archos-oxygen101-emmc-io-domain.patch
 new file mode 100644
-index 0000000000..780de17981
+index 0000000..780de17
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0006-archos-oxygen101-emmc-io-domain.patch
 @@ -0,0 +1,11 @@
@@ -1407,7 +1800,7 @@ index 0000000000..780de17981
 + 	gpio30-supply = <&vccio_pmu>;
 diff --git a/device/testing/linux-archos-oxygen101/0007-mfd-rn5t618-keep-reboot-mode.patch b/device/testing/linux-archos-oxygen101/0007-mfd-rn5t618-keep-reboot-mode.patch
 new file mode 100644
-index 0000000000..1ae1c64b0a
+index 0000000..1ae1c64
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0007-mfd-rn5t618-keep-reboot-mode.patch
 @@ -0,0 +1,18 @@
@@ -1431,7 +1824,7 @@ index 0000000000..1ae1c64b0a
 + 	/*
 diff --git a/device/testing/linux-archos-oxygen101/0008-archos-oxygen101-cpu-gpu-supplies.patch b/device/testing/linux-archos-oxygen101/0008-archos-oxygen101-cpu-gpu-supplies.patch
 new file mode 100644
-index 0000000000..908992d8ee
+index 0000000..908992d
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/0008-archos-oxygen101-cpu-gpu-supplies.patch
 @@ -0,0 +1,72 @@
@@ -1507,16 +1900,712 @@ index 0000000000..908992d8ee
 + &i2c1 {
 + 	/* mpu6050 @0x68, ak8963 @0x0d: not wired up yet */
 + 	status = "okay";
+diff --git a/device/testing/linux-archos-oxygen101/0009-archos-oxygen101-audio-imu.patch b/device/testing/linux-archos-oxygen101/0009-archos-oxygen101-audio-imu.patch
+new file mode 100644
+index 0000000..23ba8a6
+--- /dev/null
++++ b/device/testing/linux-archos-oxygen101/0009-archos-oxygen101-audio-imu.patch
+@@ -0,0 +1,150 @@
++--- a/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 10:22:05
+++++ b/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 17:20:21
++@@ -72,6 +72,40 @@
++ 		vin-supply = <&vcc_5v>;
++ 	};
++ 
+++	sound {
+++		compatible = "simple-audio-card";
+++		simple-audio-card,name = "Archos 101 Oxygen";
+++		simple-audio-card,format = "i2s";
+++		simple-audio-card,mclk-fs = <256>;
+++		simple-audio-card,hp-det-gpios = <&gpio7 RK_PA7 GPIO_ACTIVE_HIGH>;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&hp_det>;
+++		simple-audio-card,widgets =
+++			"Speaker", "Speaker",
+++			"Headphone", "Headphones",
+++			"Microphone", "Internal Mic",
+++			"Microphone", "Headset Mic";
+++		simple-audio-card,routing =
+++			"Speaker", "SPOLP",
+++			"Speaker", "SPOLN",
+++			"Speaker", "SPORP",
+++			"Speaker", "SPORN",
+++			"Headphones", "HPOL",
+++			"Headphones", "HPOR",
+++			"IN1P", "Internal Mic",
+++			"IN2P", "Headset Mic",
+++			"Headset Mic", "MICBIAS1",
+++			"Internal Mic", "MICBIAS1";
+++
+++		simple-audio-card,cpu {
+++			sound-dai = <&i2s>;
+++		};
+++
+++		simple-audio-card,codec {
+++			sound-dai = <&rt5640>;
+++		};
+++	};
+++
++ 	backlight: backlight {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm0 0 25000 0>;
++@@ -367,13 +401,42 @@
++ };
++ 
++ &i2c1 {
++-	/* mpu6050 @0x68, ak8963 @0x0d: not wired up yet */
+++	/* The stock kernel uses the internal pull-ups; the MPU-6050 needs them */
+++	pinctrl-0 = <&i2c1_xfer_pu>;
++ 	status = "okay";
+++
+++	magnetometer@d {
+++		compatible = "asahi-kasei,ak8963";
+++		reg = <0x0d>;
+++	};
+++
+++	imu@68 {
+++		compatible = "invensense,mpu6050";
+++		reg = <0x68>;
+++		interrupt-parent = <&gpio8>;
+++		interrupts = <RK_PA0 IRQ_TYPE_EDGE_RISING>;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&mpu_int>;
+++		/* The chip sits upside down: Y and Z point the other way */
+++		mount-matrix = "1",  "0",  "0",
+++			       "0", "-1",  "0",
+++			       "0",  "0", "-1";
+++	};
++ };
++ 
++ &i2c2 {
++-	/* rt5623 @0x1a, rt3261 @0x1c: audio not wired up yet */
+++	pinctrl-0 = <&i2c2_xfer_pu>;
++ 	status = "okay";
+++
+++	/* Realtek RT5640, sold to Rockchip as "RT3224"/"RT3261" */
+++	rt5640: audio-codec@1c {
+++		compatible = "realtek,rt5640";
+++		reg = <0x1c>;
+++		clocks = <&cru SCLK_I2S0_OUT>;
+++		clock-names = "mclk";
+++		realtek,ldo1-en-gpios = <&gpio7 RK_PB0 GPIO_ACTIVE_HIGH>;
+++		#sound-dai-cells = <0>;
+++	};
++ };
++ 
++ &i2c4 {
++@@ -394,7 +457,51 @@
++ 	};
++ };
++ 
+++&gpio0 {
+++	/*
+++	 * Not in the stock device tree, which calls this pin "otg_drv". The
+++	 * stock kernel drives it low, and the MPU-6050 doesn't answer
+++	 * otherwise.
+++	 */
+++	mpu-enable-hog {
+++		gpio-hog;
+++		gpios = <RK_PB4 GPIO_ACTIVE_HIGH>;
+++		output-low;
+++		line-name = "mpu-enable";
+++	};
+++};
+++
+++&i2s {
+++	status = "okay";
+++};
+++
++ &pinctrl {
+++	headphone {
+++		hp_det: hp-det {
+++			rockchip,pins = <7 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>;
+++		};
+++	};
+++
+++	i2c1 {
+++		i2c1_xfer_pu: i2c1-xfer-pu {
+++			rockchip,pins = <8 RK_PA4 1 &pcfg_pull_up>,
+++					<8 RK_PA5 1 &pcfg_pull_up>;
+++		};
+++	};
+++
+++	i2c2 {
+++		i2c2_xfer_pu: i2c2-xfer-pu {
+++			rockchip,pins = <6 RK_PB1 1 &pcfg_pull_up>,
+++					<6 RK_PB2 1 &pcfg_pull_up>;
+++		};
+++	};
+++
+++	imu {
+++		mpu_int: mpu-int {
+++			rockchip,pins = <8 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+++		};
+++	};
+++
++ 	keys {
++ 		pwr_key: pwr-key {
++ 			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>;
++@@ -469,7 +576,8 @@
++ &io_domains {
++ 	status = "okay";
++ 
++-	audio-supply = <&vccio>;
+++	/* The codec side of I2S and I2C2 runs at 1.8 V */
+++	audio-supply = <&vcc_18>;
++ 	bb-supply = <&vccio>;
++ 	dvp-supply = <&vcc_18>;
++ 	flash0-supply = <&vcc_18>;
+diff --git a/device/testing/linux-archos-oxygen101/0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch b/device/testing/linux-archos-oxygen101/0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
+new file mode 100644
+index 0000000..34f6055
+--- /dev/null
++++ b/device/testing/linux-archos-oxygen101/0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
+@@ -0,0 +1,21 @@
++clk: rockchip: rk3288: let i2s0_clkout set its parent's rate
++
++i2s0_clkout is the I2S MCLK output pin, usually the codec's master clock.
++Codec drivers such as rt5640 call clk_set_rate() on it with 256 * fs.
++Without CLK_SET_RATE_PARENT the mux can only pick a parent whose rate is
++already at most the request, so switching from 48 kHz to 44.1 kHz fails
++with -EINVAL (both i2s_pre at 12.288 MHz and xin12m are above
++11.2896 MHz). Let it adjust i2s_pre, the fractional I2S clock that the
++I2S controller sets to the same rate anyway, like clk_i2sout on rk3399.
++
++--- a/drivers/clk/rockchip/clk-rk3288.c	2026-10-21 15:45:51
+++++ b/drivers/clk/rockchip/clk-rk3288.c	2026-10-21 15:45:51
++@@ -364,7 +364,7 @@
++ 			RK3288_CLKSEL_CON(8), 0,
++ 			RK3288_CLKGATE_CON(4), 2, GFLAGS,
++ 			&rk3288_i2s_fracmux),
++-	COMPOSITE_NODIV(SCLK_I2S0_OUT, "i2s0_clkout", mux_i2s_clkout_p, 0,
+++	COMPOSITE_NODIV(SCLK_I2S0_OUT, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
++ 			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
++ 			RK3288_CLKGATE_CON(4), 0, GFLAGS),
++ 	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
+diff --git a/device/testing/linux-archos-oxygen101/0011-media-rkisp1-rk3288-parallel-input.patch b/device/testing/linux-archos-oxygen101/0011-media-rkisp1-rk3288-parallel-input.patch
+new file mode 100644
+index 0000000..3e7541f
+--- /dev/null
++++ b/device/testing/linux-archos-oxygen101/0011-media-rkisp1-rk3288-parallel-input.patch
+@@ -0,0 +1,237 @@
++media: rkisp1: support RK3288, and sensors on the low lines of the bus
++
++The ISP of the RK3288 is the same V10 block as the RK3399's. Add it,
++with its pixel input and JPEG/second core clocks, and without the MIPI
++receiver, which needs a D-PHY driver.
++
++The parallel input is MSB aligned: in the 8 and 10-bit modes the samples
++come from the top lines of the 12-line bus. On the Archos 101 Oxygen the
++OV5640's 8 data lines go to the ISP's D7-D0 instead. Read such a sensor
++at the endpoint's full bus-width, and scale the samples back up with the
++sensor de-gamma curve by default; userspace parameters can still
++replace that curve.
++
++On 32-bit ARM the IOMMU DMA mapping code splits imported buffers into
++segments of the device's maximum size (64 KiB by default) placed anywhere
++in the address space, and vb2-dma-contig then rejects them. Allow a single
++segment.
++
++--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h	2026-10-21 21:24:42
+++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-common.h	2026-10-21 22:18:49
++@@ -175,6 +175,8 @@
++  * @sd:			a pointer to v4l2_subdev struct of the sensor
++  * @pixel_rate_ctrl:	pixel rate of the sensor, used to initialize the phy
++  * @port:		port number (0: MIPI, 1: Parallel)
+++ * @bus_width:		parallel bus: number of data lines of the ISP endpoint
+++ * @data_shift:		parallel bus: number of unused data lines below the data
++  */
++ struct rkisp1_sensor_async {
++ 	struct v4l2_async_connection asd;
++@@ -186,6 +188,8 @@
++ 	struct v4l2_subdev *sd;
++ 	struct v4l2_ctrl *pixel_rate_ctrl;
++ 	unsigned int port;
+++	unsigned int bus_width;
+++	unsigned int data_shift;
++ };
++ 
++ /*
++@@ -222,6 +226,7 @@
++ 	struct media_pad pads[RKISP1_ISP_PAD_MAX];
++ 	const struct rkisp1_mbus_info *sink_fmt;
++ 	__u32 frame_sequence;
+++	unsigned int input_shift;
++ };
++ 
++ /*
++--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c	2026-10-21 21:24:42
+++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-dev.c	2026-10-22 08:32:03
++@@ -274,6 +274,8 @@
++ 			rk_asd->lanes = vep.bus.mipi_csi2.num_data_lanes;
++ 		} else {
++ 			rk_asd->mbus_flags = vep.bus.parallel.flags;
+++			rk_asd->bus_width = vep.bus.parallel.bus_width;
+++			rk_asd->data_shift = vep.bus.parallel.data_shift;
++ 		}
++ 
++ 		dev_dbg(rkisp1->dev, "registered ep id %d, bus type %u, %u lanes\n",
++@@ -515,6 +517,31 @@
++ 	.max_height = 2448,
++ };
++ 
+++static const char * const rk3288_isp_clks[] = {
+++	"isp",
+++	"aclk",
+++	"hclk",
+++	"pclk",
+++	"jpe",
+++};
+++
+++static const struct rkisp1_isr_data rk3288_isp_isrs[] = {
+++	{ NULL, rkisp1_isr, BIT(RKISP1_IRQ_ISP) | BIT(RKISP1_IRQ_MI) },
+++};
+++
+++static const struct rkisp1_info rk3288_isp_info = {
+++	.clks = rk3288_isp_clks,
+++	.clk_size = ARRAY_SIZE(rk3288_isp_clks),
+++	.isrs = rk3288_isp_isrs,
+++	.isr_size = ARRAY_SIZE(rk3288_isp_isrs),
+++	.isp_ver = RKISP1_V10,
+++	.features = RKISP1_FEATURE_SELF_PATH
+++		  | RKISP1_FEATURE_DUAL_CROP
+++		  | RKISP1_FEATURE_BLS,
+++	.max_width = 4416,
+++	.max_height = 3312,
+++};
+++
++ static const char * const rk3399_isp_clks[] = {
++ 	"isp",
++ 	"aclk",
++@@ -568,6 +595,10 @@
++ 		.data = &px30_isp_info,
++ 	},
++ 	{
+++		.compatible = "rockchip,rk3288-cif-isp",
+++		.data = &rk3288_isp_info,
+++	},
+++	{
++ 		.compatible = "rockchip,rk3399-cif-isp",
++ 		.data = &rk3399_isp_info,
++ 	},
++@@ -606,6 +637,13 @@
++ 	ret = dma_set_mask_and_coherent(dev, dma_mask);
++ 	if (ret)
++ 		return ret;
+++
+++	/*
+++	 * Imported buffers must map to a single contiguous range. The 32-bit
+++	 * ARM IOMMU mapping code only merges scatterlist entries up to the
+++	 * maximum segment size, 64 KiB by default.
+++	 */
+++	dma_set_max_seg_size(dev, UINT_MAX);
++ 
++ 	mutex_init(&rkisp1->stream_lock);
++ 
++--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c	2026-10-21 21:24:42
+++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-isp.c	2026-10-21 22:18:49
++@@ -202,7 +202,8 @@
++  */
++ static int rkisp1_config_isp(struct rkisp1_isp *isp,
++ 			     const struct v4l2_subdev_state *sd_state,
++-			     enum v4l2_mbus_type mbus_type, u32 mbus_flags)
+++			     enum v4l2_mbus_type mbus_type, u32 mbus_flags,
+++			     unsigned int bus_width, unsigned int data_shift)
++ {
++ 	struct rkisp1_device *rkisp1 = isp->rkisp1;
++ 	u32 isp_ctrl = 0, irq_mask = 0, acq_mult = 0, acq_prop = 0;
++@@ -253,11 +254,24 @@
++ 	}
++ 
++ 	/* Set up input acquisition properties */
+++	isp->input_shift = 0;
++ 	if (mbus_type == V4L2_MBUS_BT656 || mbus_type == V4L2_MBUS_PARALLEL) {
++ 		if (mbus_flags & V4L2_MBUS_PCLK_SAMPLE_RISING)
++ 			acq_prop |= RKISP1_CIF_ISP_ACQ_PROP_POS_EDGE;
++ 
++-		switch (sink_fmt->bus_width) {
+++		/*
+++		 * The input is MSB aligned: the narrower modes drop the low
+++		 * data lines. A sensor wired below the top line of a wider
+++		 * bus (endpoint bus-width larger than the format's) is read
+++		 * at the full width, and its samples are scaled back up by
+++		 * the sensor de-gamma curve (see rkisp1_params_pre_configure()).
+++		 */
+++		if (bus_width > sink_fmt->bus_width &&
+++		    bus_width > sink_fmt->bus_width + data_shift)
+++			isp->input_shift = bus_width - sink_fmt->bus_width -
+++					   data_shift;
+++
+++		switch (max(bus_width, sink_fmt->bus_width)) {
++ 		case 8:
++ 			acq_prop |= RKISP1_CIF_ISP_ACQ_PROP_IN_SEL_8B_ZERO;
++ 			break;
++@@ -341,11 +355,13 @@
++ /* Hardware configure Entry */
++ static int rkisp1_config_cif(struct rkisp1_isp *isp,
++ 			     struct v4l2_subdev_state *sd_state,
++-			     enum v4l2_mbus_type mbus_type, u32 mbus_flags)
+++			     enum v4l2_mbus_type mbus_type, u32 mbus_flags,
+++			     unsigned int bus_width, unsigned int data_shift)
++ {
++ 	int ret;
++ 
++-	ret = rkisp1_config_isp(isp, sd_state, mbus_type, mbus_flags);
+++	ret = rkisp1_config_isp(isp, sd_state, mbus_type, mbus_flags,
+++				bus_width, data_shift);
++ 	if (ret)
++ 		return ret;
++ 
++@@ -924,6 +940,7 @@
++ 	struct media_pad *source_pad;
++ 	struct media_pad *sink_pad;
++ 	enum v4l2_mbus_type mbus_type;
+++	unsigned int bus_width = 0, data_shift = 0;
++ 	u32 mbus_flags;
++ 	int ret;
++ 
++@@ -962,13 +979,16 @@
++ 
++ 		mbus_type = asd->mbus_type;
++ 		mbus_flags = asd->mbus_flags;
+++		bus_width = asd->bus_width;
+++		data_shift = asd->data_shift;
++ 	}
++ 
++ 	isp->frame_sequence = -1;
++ 
++ 	sd_state = v4l2_subdev_lock_and_get_active_state(sd);
++ 
++-	ret = rkisp1_config_cif(isp, sd_state, mbus_type, mbus_flags);
+++	ret = rkisp1_config_cif(isp, sd_state, mbus_type, mbus_flags,
+++				bus_width, data_shift);
++ 	if (ret)
++ 		goto out_unlock;
++ 
++--- a/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c	2026-10-21 22:18:19
+++++ b/drivers/media/platform/rockchip/rkisp1/rkisp1-params.c	2026-10-21 22:18:49
++@@ -2243,6 +2243,30 @@
++ 	14
++ };
++ 
+++/*
+++ * Scale the input samples by 2^shift with the sensor de-gamma curve, for
+++ * sensors wired below the top data line (see rkisp1_config_isp()). The 16
+++ * segments of 16 cover 0-255, the input range of an 8-bit sensor read on
+++ * the low lines of a 12-bit bus.
+++ */
+++static void rkisp1_sdg_scale(struct rkisp1_params *params, unsigned int shift)
+++{
+++	struct rkisp1_cif_isp_sdg_config sdg = { };
+++	unsigned int i;
+++
+++	for (i = 0; i < RKISP1_CIF_ISP_DEGAMMA_CURVE_SIZE; i++) {
+++		u16 y = min(i * (16U << shift), 4095U);
+++
+++		sdg.curve_r.gamma_y[i] = y;
+++		sdg.curve_g.gamma_y[i] = y;
+++		sdg.curve_b.gamma_y[i] = y;
+++	}
+++
+++	rkisp1_sdg_config(params, &sdg);
+++	rkisp1_param_set_bits(params, RKISP1_CIF_ISP_CTRL,
+++			      RKISP1_CIF_ISP_CTRL_ISP_GAMMA_IN_ENA);
+++}
+++
++ void rkisp1_params_pre_configure(struct rkisp1_params *params,
++ 				 enum rkisp1_fmt_raw_pat_type bayer_pat,
++ 				 enum v4l2_quantization quantization,
++@@ -2273,6 +2297,9 @@
++ 			      rkisp1_hst_params_default_config.mode);
++ 
++ 	rkisp1_csm_config(params);
+++
+++	if (params->rkisp1->isp.input_shift)
+++		rkisp1_sdg_scale(params, params->rkisp1->isp.input_shift);
++ 
++ 	spin_lock_irq(&params->config_lock);
++ 
+diff --git a/device/testing/linux-archos-oxygen101/0012-archos-oxygen101-camera.patch b/device/testing/linux-archos-oxygen101/0012-archos-oxygen101-camera.patch
+new file mode 100644
+index 0000000..40d19cc
+--- /dev/null
++++ b/device/testing/linux-archos-oxygen101/0012-archos-oxygen101-camera.patch
+@@ -0,0 +1,161 @@
++--- a/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-21 17:20:21
+++++ b/arch/arm/boot/dts/rockchip/rk3288-archos-oxygen101.dts	2026-10-22 09:15:32
++@@ -7,6 +7,7 @@
++ /dts-v1/;
++ #include <dt-bindings/gpio/gpio.h>
++ #include <dt-bindings/input/input.h>
+++#include <dt-bindings/media/video-interfaces.h>
++ #include <dt-bindings/interrupt-controller/irq.h>
++ #include <dt-bindings/pinctrl/rockchip.h>
++ #include <dt-bindings/pwm/pwm.h>
++@@ -70,6 +71,53 @@
++ 		gpio = <&gpio0 RK_PB6 GPIO_ACTIVE_HIGH>;
++ 		enable-active-high;
++ 		vin-supply = <&vcc_5v>;
+++	};
+++
+++	/* Both cameras; the stock kernel calls the enable "pwen" */
+++	vcc_camera: regulator-vcc-camera {
+++		compatible = "regulator-fixed";
+++		regulator-name = "vcc_camera";
+++		regulator-min-microvolt = <2800000>;
+++		regulator-max-microvolt = <2800000>;
+++		gpio = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
+++		enable-active-high;
+++		vin-supply = <&vcc_sys>;
+++	};
+++
+++	isp: isp@ff910000 {
+++		compatible = "rockchip,rk3288-cif-isp";
+++		reg = <0x0 0xff910000 0x0 0x4000>;
+++		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+++		clocks = <&cru SCLK_ISP>, <&cru ACLK_ISP>, <&cru HCLK_ISP>,
+++			 <&cru PCLK_ISP_IN>, <&cru SCLK_ISP_JPE>;
+++		clock-names = "isp", "aclk", "hclk", "pclk", "jpe";
+++		iommus = <&isp_mmu>;
+++		power-domains = <&power RK3288_PD_VIO>;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&isp_dvp>;
+++
+++		ports {
+++			#address-cells = <1>;
+++			#size-cells = <0>;
+++
+++			port@1 {
+++				reg = <1>;
+++
+++				/*
+++				 * The sensor's D9-D2 reach the ISP's D7-D0, the
+++				 * low lines of its 12-line bus; polarities as
+++				 * the stock kernel programs them.
+++				 */
+++				isp_parallel_in: endpoint {
+++					remote-endpoint = <&ov5640_out>;
+++					bus-type = <MEDIA_BUS_TYPE_PARALLEL>;
+++					bus-width = <12>;
+++					hsync-active = <1>;
+++					vsync-active = <0>;
+++					pclk-sample = <1>;
+++				};
+++			};
+++		};
++ 	};
++ 
++ 	sound {
++@@ -468,6 +516,53 @@
++ 		gpios = <RK_PB4 GPIO_ACTIVE_HIGH>;
++ 		output-low;
++ 		line-name = "mpu-enable";
+++	};
+++};
+++
+++&gpio2 {
+++	/* Front camera (OV2659): keep it off the shared parallel bus */
+++	ov2659-powerdown-hog {
+++		gpio-hog;
+++		gpios = <RK_PB6 GPIO_ACTIVE_HIGH>;
+++		output-high;
+++		line-name = "ov2659-powerdown";
+++	};
+++};
+++
+++&i2c3 {
+++	status = "okay";
+++
+++	/* Back camera */
+++	camera@3c {
+++		compatible = "ovti,ov5640";
+++		reg = <0x3c>;
+++		clocks = <&cru SCLK_VIP_OUT>;
+++		clock-names = "xclk";
+++		assigned-clocks = <&cru SCLK_VIP_OUT>;
+++		assigned-clock-parents = <&xin24m>;
+++		assigned-clock-rates = <24000000>;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&isp_clkout>;
+++		powerdown-gpios = <&gpio2 RK_PB7 GPIO_ACTIVE_HIGH>;
+++		AVDD-supply = <&vcc_camera>;
+++		DVDD-supply = <&vcc_camera>;
+++		DOVDD-supply = <&vcc_camera>;
+++		/* On the back, upright in landscape */
+++		orientation = <1>;
+++		rotation = <0>;
+++
+++		port {
+++			/* Gives the stock POLARITY_CTRL00 value, 0x20 */
+++			ov5640_out: endpoint {
+++				remote-endpoint = <&isp_parallel_in>;
+++				bus-type = <MEDIA_BUS_TYPE_PARALLEL>;
+++				bus-width = <8>;
+++				data-shift = <2>;
+++				hsync-active = <0>;
+++				vsync-active = <1>;
+++				pclk-sample = <1>;
+++			};
+++		};
++ 	};
++ };
++ 
++@@ -475,6 +570,10 @@
++ 	status = "okay";
++ };
++ 
+++&isp_mmu {
+++	status = "okay";
+++};
+++
++ &pinctrl {
++ 	headphone {
++ 		hp_det: hp-det {
++@@ -496,6 +595,31 @@
++ 		};
++ 	};
++ 
+++	isp {
+++		/*
+++		 * D0-D7, vsync, href, pixel clock. D8-D11 stay GPIOs so the
+++		 * ISP reads them as 0: D8/D9 are pulled up, D10/D11 are the
+++		 * cameras' power-down lines.
+++		 */
+++		isp_dvp: isp-dvp {
+++			rockchip,pins = <2 RK_PB4 1 &pcfg_pull_none>,
+++					<2 RK_PB5 1 &pcfg_pull_none>,
+++					<2 RK_PA0 1 &pcfg_pull_none>,
+++					<2 RK_PA1 1 &pcfg_pull_none>,
+++					<2 RK_PA2 1 &pcfg_pull_none>,
+++					<2 RK_PA3 1 &pcfg_pull_none>,
+++					<2 RK_PA4 1 &pcfg_pull_none>,
+++					<2 RK_PA5 1 &pcfg_pull_none>,
+++					<2 RK_PB0 1 &pcfg_pull_none>,
+++					<2 RK_PB1 1 &pcfg_pull_none>,
+++					<2 RK_PB2 1 &pcfg_pull_none>;
+++		};
+++
+++		isp_clkout: isp-clkout {
+++			rockchip,pins = <2 RK_PB3 1 &pcfg_pull_none>;
+++		};
+++	};
+++
++ 	imu {
++ 		mpu_int: mpu-int {
++ 			rockchip,pins = <8 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+diff --git a/device/testing/linux-archos-oxygen101/0013-media-ov5640-dvp-minimum-clock.patch b/device/testing/linux-archos-oxygen101/0013-media-ov5640-dvp-minimum-clock.patch
+new file mode 100644
+index 0000000..3b26b3e
+--- /dev/null
++++ b/device/testing/linux-archos-oxygen101/0013-media-ov5640-dvp-minimum-clock.patch
+@@ -0,0 +1,97 @@
++media: ov5640: keep the parallel clock above 40 MHz
++
++With 8-bit raw output at 1280x720 and 15 fps the driver programs a 84 MHz
++system clock. At that rate the black level calibration reads garbage
++(0x402c-0x4033 stuck at 0x1ff8): frames are black until the gain is high
++enough to clip, and the auto exposure oscillates. 30 fps (170 MHz) works.
++
++For such modes run the clock at an integer multiple of the needed rate and
++make the frame taller (VTS) by the same factor, so the frame rate is still
++the one requested and longer exposures become possible.
++
++--- a/drivers/media/i2c/ov5640.c
+++++ b/drivers/media/i2c/ov5640.c
++@@ -41,6 +41,13 @@
++ #define OV5640_MIN_VBLANK	24
++ #define OV5640_MAX_VTS		3375
++ 
+++/*
+++ * Below this parallel bus clock (a system clock of 160 MHz) the black level
+++ * calibration fails and the sensor outputs black frames, e.g. 8-bit raw
+++ * 1280x720 at 15 fps. Such modes run the clock faster with a taller frame.
+++ */
+++#define OV5640_DVP_MIN_RATE	40000000
+++
++ #define OV5640_DEFAULT_SLAVE_ID 0x3c
++ 
++ #define OV5640_LINK_RATE_MAX		490000000U
++@@ -1547,6 +1554,27 @@
++ 	return ov5640_write_reg(sensor, OV5640_REG_PCLK_PERIOD, pclk_period);
++ }
++ 
+++/* Factor applied to the frame height to keep the DVP clock fast enough */
+++static unsigned int ov5640_dvp_vts_scale(struct ov5640_dev *sensor)
+++{
+++	const struct ov5640_mode_info *mode = sensor->current_mode;
+++	const struct ov5640_timings *timings = &mode->dvp_timings;
+++	u32 vts = mode->height + timings->vblank_def;
+++	unsigned int scale = 1;
+++	u64 rate;
+++
+++	rate = (u64)timings->htot * (timings->crop.height + timings->vblank_def);
+++	rate *= ov5640_framerates[sensor->current_fr];
+++	rate *= ov5640_code_to_bpp(sensor, sensor->fmt.code);
+++	do_div(rate, sensor->ep.bus.parallel.bus_width);
+++
+++	while (rate * scale < OV5640_DVP_MIN_RATE &&
+++	       vts * (scale + 1) <= OV5640_MAX_VTS)
+++		scale++;
+++
+++	return scale;
+++}
+++
++ static u32 ov5640_calc_pixel_rate(struct ov5640_dev *sensor)
++ {
++ 	const struct ov5640_mode_info *mode = sensor->current_mode;
++@@ -1556,7 +1584,7 @@
++ 	rate = timings->htot * (timings->crop.height + timings->vblank_def);
++ 	rate *= ov5640_framerates[sensor->current_fr];
++ 
++-	return rate;
+++	return rate * ov5640_dvp_vts_scale(sensor);
++ }
++ 
++ static unsigned long ov5640_calc_pclk(struct ov5640_dev *sensor,
++@@ -1651,6 +1679,7 @@
++ 	const struct ov5640_timings *timings;
++ 	const struct v4l2_rect *analog_crop;
++ 	const struct v4l2_rect *crop;
+++	u32 vts;
++ 	int ret;
++ 
++ 	if (sensor->fmt.code == MEDIA_BUS_FMT_JPEG_1X8) {
++@@ -1703,8 +1732,11 @@
++ 	if (ret < 0)
++ 		return ret;
++ 
++-	ret = ov5640_write_reg16(sensor, OV5640_REG_TIMING_VTS,
++-				 mode->height + timings->vblank_def);
+++	vts = mode->height + timings->vblank_def;
+++	if (!ov5640_is_csi2(sensor))
+++		vts *= ov5640_dvp_vts_scale(sensor);
+++
+++	ret = ov5640_write_reg16(sensor, OV5640_REG_TIMING_VTS, vts);
++ 	if (ret < 0)
++ 		return ret;
++ 
++@@ -2884,7 +2916,9 @@
++ 		__v4l2_ctrl_s_ctrl_int64(sensor->ctrls.pixel_rate,
++ 					 ov5640_calc_pixel_rate(sensor));
++ 
++-		__v4l2_ctrl_vblank_update(sensor, timings->vblank_def);
+++		vblank = (mode->height + timings->vblank_def) *
+++			 ov5640_dvp_vts_scale(sensor) - mode->height;
+++		__v4l2_ctrl_vblank_update(sensor, vblank);
++ 
++ 		return 0;
++ 	}
 diff --git a/device/testing/linux-archos-oxygen101/APKBUILD b/device/testing/linux-archos-oxygen101/APKBUILD
 new file mode 100644
-index 0000000000..fdb1df1245
+index 0000000..c0f94f4
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/APKBUILD
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,107 @@
 +maintainer="Tom Barbette <tom.barbette@uclouvain.be>"
 +pkgname=linux-archos-oxygen101
 +pkgver=6.12.90
-+pkgrel=9
++pkgrel=0
 +pkgdesc="Mainline kernel for the Archos 101 Oxygen (RK3288)"
 +arch="armv7"
 +_carch="arm"
@@ -1560,6 +2649,11 @@ index 0000000000..fdb1df1245
 +	0006-archos-oxygen101-emmc-io-domain.patch
 +	0007-mfd-rn5t618-keep-reboot-mode.patch
 +	0008-archos-oxygen101-cpu-gpu-supplies.patch
++	0009-archos-oxygen101-audio-imu.patch
++	0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
++	0011-media-rkisp1-rk3288-parallel-input.patch
++	0012-archos-oxygen101-camera.patch
++	0013-media-ov5640-dvp-minimum-clock.patch
 +"
 +builddir="$srcdir/linux-$_kernver"
 +
@@ -1595,7 +2689,7 @@ index 0000000000..fdb1df1245
 +
 +sha512sums="
 +8b909649740677cebb8876f61c6dcfe5646f5d4acd1a8141830a1ec21e5eedf8b0c678f37df13a5733f21c2ef137faf81ed09407d7bdc1dca35b134233f71317  linux-6.12.90.tar.xz
-+a1a524ca3dc2588e6a6292f0cccb18b163f884d0d76eed1f79df2aa9fbae18746fe7bc26d1a0b75391241b96506b9a297ad7bd45994f3562ba0129ee206ec5f0  config-archos-oxygen101.armv7
++554fea72a93caf833d0b25ddaf39c9ad04f71dfe9e311d9a2317b34ea0c1cb371553e3255dfaafb403e54b5de26c0c8fb5922ded41f5f9aac4cf879a48ab82ad  config-archos-oxygen101.armv7
 +4f74aa47f8296c03db33ed808c3f7609a87a6109abff6efb47abfaff14d68f57cb05ad5fbb255dc00541b08c0853b241554defc43513f4eb5a4709de952b0e89  veyron.better_clock_selection_logic_and_dts_rate_list.patch
 +cec81f88da19dc928c54780bf1d39efdf23dee481bc1a3a81cb17f506328103221ef47ee020f5e5b393f20fc20242937698cb733aa376e5d79a75b98c486e513  veyron.dts_allow_dedicating_npll_to_vop.patch
 +f4336cc18991a01a7d532610758c640d633d1f7ac05e42c229da418eeed109c67c721d6ed5eea593d36178fb8b420dcbd2c0759876358081c669919192330cec  veyron.dts_do_dedicate_npll_to_vop.patch
@@ -1609,13 +2703,18 @@ index 0000000000..fdb1df1245
 +e9da3005d2844030e1f133baff9b406409af139d10d166f23dcbb0ee17702edbed9418fec3ae6fab559bd475dfd9123a9702b6cfed8bba307224a954a7f9d20a  0006-archos-oxygen101-emmc-io-domain.patch
 +540267f61e4a06f5791defc956615f6bebcb00bec7689e729c51e63e36fe5b1cc73a58c02e962233de7f83b26eceead4662bb631145f6d7024257a386977c9d3  0007-mfd-rn5t618-keep-reboot-mode.patch
 +2da792f2bf0fc3eaac13a830a2348e6d9e408f2172b64e94c4294fffb29048eec1a46ac9cd1536a8a052cda750afb4e9bb3175e0576b6bb2c8f686d68c6d3b9b  0008-archos-oxygen101-cpu-gpu-supplies.patch
++8164e75ba27aa4cb72f134a2670f291b8ba8ccf3b5fc6e3d62d81e23b6559f0676e697af4ea17c6bf3e61289a482e646d0caac04ea2e0845f3bbd18727c58362  0009-archos-oxygen101-audio-imu.patch
++0443f71ead1d5bc903c4508594276b2a837f277a502d069703365698d2fb09960a5d52cff408a1d63bc38a695880e0e75faf85c6c24030e8f035477fa6c9c543  0010-clk-rockchip-rk3288-i2s0-clkout-set-rate-parent.patch
++de42503feb3b554cfa55b8e233eaaca1b9c26c705e1cb7d84c1eb412292eaeabe53b7bc42accb837ef1755a9eb4d391417368e92d2a1d6359442c290630a2b0a  0011-media-rkisp1-rk3288-parallel-input.patch
++2d0f0a8781f7f448ae3b7e6fb80c17abba37bc0a9d505d973be77e34e2fa165e0f5dc2ab1fa238106867f0a67347a0268af33f64e72809862de1a2176cb24bdf  0012-archos-oxygen101-camera.patch
++3ebe6c1600528719a9acf464008386643b0ad623c4dcdf3a21f77abe200a5da3d00a8b0691635efa4c41144b07509c2fe40605f960b1c2df8bf1b9dfed9c2615  0013-media-ov5640-dvp-minimum-clock.patch
 +"
 diff --git a/device/testing/linux-archos-oxygen101/config-archos-oxygen101.armv7 b/device/testing/linux-archos-oxygen101/config-archos-oxygen101.armv7
 new file mode 100644
-index 0000000000..043e339d20
+index 0000000..d339012
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/config-archos-oxygen101.armv7
-@@ -0,0 +1,8825 @@
+@@ -0,0 +1,8827 @@
 +#
 +# Automatically generated file; DO NOT EDIT.
 +# Linux/arm 6.12.90 Kernel Configuration
@@ -5907,7 +7006,7 @@ index 0000000000..043e339d20
 +# Rockchip media platform drivers
 +#
 +CONFIG_VIDEO_ROCKCHIP_RGA=m
-+# CONFIG_VIDEO_ROCKCHIP_ISP1 is not set
++CONFIG_VIDEO_ROCKCHIP_ISP1=m
 +
 +#
 +# Samsung media platform drivers
@@ -6026,7 +7125,7 @@ index 0000000000..043e339d20
 +# CONFIG_VIDEO_OV2680 is not set
 +# CONFIG_VIDEO_OV2685 is not set
 +# CONFIG_VIDEO_OV4689 is not set
-+# CONFIG_VIDEO_OV5640 is not set
++CONFIG_VIDEO_OV5640=m
 +# CONFIG_VIDEO_OV5645 is not set
 +# CONFIG_VIDEO_OV5647 is not set
 +# CONFIG_VIDEO_OV5648 is not set
@@ -7070,7 +8169,7 @@ index 0000000000..043e339d20
 +CONFIG_SND_SOC_RL6231=m
 +# CONFIG_SND_SOC_RT5616 is not set
 +# CONFIG_SND_SOC_RT5631 is not set
-+# CONFIG_SND_SOC_RT5640 is not set
++CONFIG_SND_SOC_RT5640=m
 +CONFIG_SND_SOC_RT5645=m
 +# CONFIG_SND_SOC_RT5659 is not set
 +# CONFIG_SND_SOC_RT9120 is not set
@@ -7164,7 +8263,7 @@ index 0000000000..043e339d20
 +# end of CODEC drivers
 +
 +CONFIG_SND_SIMPLE_CARD_UTILS=m
-+# CONFIG_SND_SIMPLE_CARD is not set
++CONFIG_SND_SIMPLE_CARD=m
 +CONFIG_SND_AUDIO_GRAPH_CARD=m
 +# CONFIG_SND_AUDIO_GRAPH_CARD2 is not set
 +# CONFIG_SND_TEST_COMPONENT is not set
@@ -8109,7 +9208,9 @@ index 0000000000..043e339d20
 +# CONFIG_DMABUF_MOVE_NOTIFY is not set
 +# CONFIG_DMABUF_DEBUG is not set
 +# CONFIG_DMABUF_SELFTESTS is not set
-+# CONFIG_DMABUF_HEAPS is not set
++CONFIG_DMABUF_HEAPS=y
++CONFIG_DMABUF_HEAPS_SYSTEM=y
++CONFIG_DMABUF_HEAPS_CMA=y
 +# CONFIG_DMABUF_SYSFS_STATS is not set
 +# end of DMABUF options
 +
@@ -8918,7 +10019,7 @@ index 0000000000..043e339d20
 +# CONFIG_KMX61 is not set
 +# CONFIG_INV_ICM42600_I2C is not set
 +# CONFIG_INV_ICM42600_SPI is not set
-+# CONFIG_INV_MPU6050_I2C is not set
++CONFIG_INV_MPU6050_I2C=m
 +# CONFIG_INV_MPU6050_SPI is not set
 +# CONFIG_IIO_ST_LSM6DSX is not set
 +# CONFIG_IIO_ST_LSM9DS0 is not set
@@ -10106,7 +11207,7 @@ index 0000000000..043e339d20
 +#
 +# Default contiguous memory area size:
 +#
-+CONFIG_CMA_SIZE_MBYTES=64
++CONFIG_CMA_SIZE_MBYTES=128
 +CONFIG_CMA_SIZE_SEL_MBYTES=y
 +# CONFIG_CMA_SIZE_SEL_PERCENTAGE is not set
 +# CONFIG_CMA_SIZE_SEL_MIN is not set
@@ -10443,7 +11544,7 @@ index 0000000000..043e339d20
 +CONFIG_TOUCHSCREEN_VTL_CT36X=y
 diff --git a/device/testing/linux-archos-oxygen101/veyron.better_clock_selection_logic_and_dts_rate_list.patch b/device/testing/linux-archos-oxygen101/veyron.better_clock_selection_logic_and_dts_rate_list.patch
 new file mode 100644
-index 0000000000..ebef1fafab
+index 0000000..ebef1fa
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/veyron.better_clock_selection_logic_and_dts_rate_list.patch
 @@ -0,0 +1,456 @@
@@ -10905,7 +12006,7 @@ index 0000000000..ebef1fafab
 +
 diff --git a/device/testing/linux-archos-oxygen101/veyron.dts_allow_dedicating_npll_to_vop.patch b/device/testing/linux-archos-oxygen101/veyron.dts_allow_dedicating_npll_to_vop.patch
 new file mode 100644
-index 0000000000..0c89ebbb7d
+index 0000000..0c89ebb
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/veyron.dts_allow_dedicating_npll_to_vop.patch
 @@ -0,0 +1,35 @@
@@ -10946,7 +12047,7 @@ index 0000000000..0c89ebbb7d
 + 				       <300000000>, <150000000>,
 diff --git a/device/testing/linux-archos-oxygen101/veyron.dts_do_dedicate_npll_to_vop.patch b/device/testing/linux-archos-oxygen101/veyron.dts_do_dedicate_npll_to_vop.patch
 new file mode 100644
-index 0000000000..e97f69f175
+index 0000000..e97f69f
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/veyron.dts_do_dedicate_npll_to_vop.patch
 @@ -0,0 +1,89 @@
@@ -11041,7 +12142,7 @@ index 0000000000..e97f69f175
 + 
 diff --git a/device/testing/linux-archos-oxygen101/veyron.ignore-gpt-ignoreme.patch b/device/testing/linux-archos-oxygen101/veyron.ignore-gpt-ignoreme.patch
 new file mode 100644
-index 0000000000..75880e3cff
+index 0000000..75880e3
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/veyron.ignore-gpt-ignoreme.patch
 @@ -0,0 +1,149 @@
@@ -11196,7 +12297,7 @@ index 0000000000..75880e3cff
 + 
 diff --git a/device/testing/linux-archos-oxygen101/veyron.support_dedicating_npll_to_vop.patch b/device/testing/linux-archos-oxygen101/veyron.support_dedicating_npll_to_vop.patch
 new file mode 100644
-index 0000000000..103cb47445
+index 0000000..103cb47
 --- /dev/null
 +++ b/device/testing/linux-archos-oxygen101/veyron.support_dedicating_npll_to_vop.patch
 @@ -0,0 +1,166 @@
@@ -11367,5 +12468,5 @@ index 0000000000..103cb47445
 + 	branch_composite,
 + 	branch_mux,
 -- 
-2.49.1
+2.55.0
 
